@@ -4,6 +4,7 @@ import type {
   NormalizedLandmark,
   PlayerId,
   PlayerStats,
+  SlashGameMode,
   Target,
   TargetKind,
 } from './types';
@@ -33,9 +34,13 @@ function createInitialPlayerStats(): PlayerStats {
   };
 }
 
-export function createInitialGameState(phase: GamePhase = 'title'): GameState {
+export function createInitialGameState(
+  phase: GamePhase = 'title',
+  mode: SlashGameMode = '1v1'
+): GameState {
   return {
     phase,
+    mode,
     timeRemaining: ROUND_DURATION_SEC,
     elapsed: 0,
     p1: createInitialPlayerStats(),
@@ -52,7 +57,12 @@ export function createInitialGameState(phase: GamePhase = 'title'): GameState {
   };
 }
 
-export function getPlayerSideForX(x: number, width: number): PlayerId {
+export function getPlayerSideForX(
+  x: number,
+  width: number,
+  mode: SlashGameMode = '1v1'
+): PlayerId {
+  if (mode === 'solo') return 'p1';
   return x < width * 0.5 ? 'p1' : 'p2';
 }
 
@@ -113,7 +123,12 @@ export function computeTugOfWarRatio(p1Score: number, p2Score: number): number {
   return Math.max(0.08, Math.min(0.92, normalized));
 }
 
-export function determineWinner(p1Score: number, p2Score: number): PlayerId | 'draw' {
+export function determineWinner(
+  p1Score: number,
+  p2Score: number,
+  mode: SlashGameMode = '1v1'
+): PlayerId | 'draw' | 'solo' {
+  if (mode === 'solo') return 'solo';
   if (p1Score > p2Score) return 'p1';
   if (p2Score > p1Score) return 'p2';
   return 'draw';
@@ -122,9 +137,15 @@ export function determineWinner(p1Score: number, p2Score: number): PlayerId | 'd
 export function pickTargetKind(
   side: PlayerId,
   elapsed: number,
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  mode: SlashGameMode = '1v1'
 ): TargetKind {
   const r = rng();
+  if (mode === 'solo') {
+    const bombChance = Math.min(0.24, 0.12 + (elapsed / ROUND_DURATION_SEC) * 0.12);
+    return r < bombChance ? 'skull_bomb' : 'p1_gem';
+  }
+
   const bombChance = Math.min(0.22, 0.12 + (elapsed / ROUND_DURATION_SEC) * 0.1);
   const sabotageChance = 0.1;
   const crossColorChance = 0.12;
@@ -143,15 +164,16 @@ export function spawnTargetForSide(
   width: number,
   height: number,
   elapsed: number,
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  mode: SlashGameMode = '1v1'
 ): Target {
   const safeWidth = Math.max(320, width);
   const safeHeight = Math.max(320, height);
   const halfWidth = safeWidth * 0.5;
-  const margin = Math.min(72, halfWidth * 0.18);
+  const margin = mode === 'solo' ? Math.min(96, safeWidth * 0.14) : Math.min(72, halfWidth * 0.18);
 
-  const minX = side === 'p1' ? margin : halfWidth + margin;
-  const maxX = side === 'p1' ? halfWidth - margin : safeWidth - margin;
+  const minX = mode === 'solo' ? margin : side === 'p1' ? margin : halfWidth + margin;
+  const maxX = mode === 'solo' ? safeWidth - margin : side === 'p1' ? halfWidth - margin : safeWidth - margin;
   const x = minX + rng() * Math.max(40, maxX - minX);
   const y = safeHeight + 36;
 
@@ -159,11 +181,12 @@ export function spawnTargetForSide(
   const targetPeakHeight = safeHeight * (0.55 + rng() * 0.27);
   const vy = -Math.sqrt(2 * GRAVITY_PX_PER_SEC2 * targetPeakHeight);
 
-  // Aim slightly inward toward the center of that player's half so arcs stay readable
-  const sideCenterX = side === 'p1' ? halfWidth * 0.5 : halfWidth * 1.5;
+  // Aim slightly inward toward the center of that player's half (or full arena in solo)
+  const sideCenterX =
+    mode === 'solo' ? safeWidth * 0.5 : side === 'p1' ? halfWidth * 0.5 : halfWidth * 1.5;
   const vx = (sideCenterX - x) * (0.35 + rng() * 0.35) + (rng() - 0.5) * 70;
 
-  const kind = pickTargetKind(side, elapsed, rng);
+  const kind = pickTargetKind(side, elapsed, rng, mode);
   const radius =
     kind === 'skull_bomb' ? 30 : kind === 'sabotage_orb' ? 28 : 32 + rng() * 6;
 
@@ -363,24 +386,51 @@ export function stepGameSimulation(
     }
   }
 
-  // Wave spawning across both P1 and P2 halves fairly
+  // Wave spawning across both halves (1v1) or full arena (solo)
   state.spawnCooldown -= dt;
   if (state.spawnCooldown <= 0 && state.timeRemaining > 1.2) {
     const progress = state.elapsed / ROUND_DURATION_SEC;
     const baseInterval = Math.max(0.55, 1.15 - progress * 0.5);
     state.spawnCooldown = baseInterval * (0.8 + rng() * 0.4);
 
-    // Spawn symmetrical or dual-side wave so both P1 and P2 stay engaged
-    const p1Target = spawnTargetForSide(state.nextTargetId++, 'p1', width, height, state.elapsed, rng);
-    const p2Target = spawnTargetForSide(state.nextTargetId++, 'p2', width, height, state.elapsed, rng);
-    state.targets.push(p1Target, p2Target);
-
-    // Occasional extra target during mid/late round
-    if (progress > 0.35 && rng() < 0.45) {
-      const bonusSide: PlayerId = rng() < 0.5 ? 'p1' : 'p2';
-      state.targets.push(
-        spawnTargetForSide(state.nextTargetId++, bonusSide, width, height, state.elapsed, rng)
+    if (state.mode === 'solo') {
+      const first = spawnTargetForSide(
+        state.nextTargetId++,
+        'p1',
+        width,
+        height,
+        state.elapsed,
+        rng,
+        'solo'
       );
+      const second = spawnTargetForSide(
+        state.nextTargetId++,
+        'p1',
+        width,
+        height,
+        state.elapsed,
+        rng,
+        'solo'
+      );
+      state.targets.push(first, second);
+      if (progress > 0.35 && rng() < 0.45) {
+        state.targets.push(
+          spawnTargetForSide(state.nextTargetId++, 'p1', width, height, state.elapsed, rng, 'solo')
+        );
+      }
+    } else {
+      // Spawn symmetrical or dual-side wave so both P1 and P2 stay engaged
+      const p1Target = spawnTargetForSide(state.nextTargetId++, 'p1', width, height, state.elapsed, rng, '1v1');
+      const p2Target = spawnTargetForSide(state.nextTargetId++, 'p2', width, height, state.elapsed, rng, '1v1');
+      state.targets.push(p1Target, p2Target);
+
+      // Occasional extra target during mid/late round
+      if (progress > 0.35 && rng() < 0.45) {
+        const bonusSide: PlayerId = rng() < 0.5 ? 'p1' : 'p2';
+        state.targets.push(
+          spawnTargetForSide(state.nextTargetId++, bonusSide, width, height, state.elapsed, rng, '1v1')
+        );
+      }
     }
   }
 

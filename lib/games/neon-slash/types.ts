@@ -8,6 +8,8 @@ export type NormalizedLandmark = MediaPipeNormalizedLandmark;
 
 export type PlayerId = 'p1' | 'p2';
 
+export type SlashGameMode = '1v1' | 'solo';
+
 export type GamePhase = 'title' | 'playing' | 'paused' | 'gameover';
 
 export type TargetKind = 'p1_gem' | 'p2_gem' | 'skull_bomb' | 'sabotage_orb';
@@ -95,6 +97,7 @@ export interface PlayerStats {
 
 export interface GameState {
   phase: GamePhase;
+  mode: SlashGameMode;
   timeRemaining: number;
   elapsed: number;
   p1: PlayerStats;
@@ -111,7 +114,8 @@ export interface GameState {
 }
 
 export interface EndGameSummary {
-  winner: PlayerId | 'draw';
+  winner: PlayerId | 'draw' | 'solo';
+  mode: SlashGameMode;
   p1: PlayerStats;
   p2: PlayerStats;
 }

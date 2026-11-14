@@ -5,10 +5,8 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
   Camera,
-  ChevronRight,
   Lock,
   Play,
-  SlidersHorizontal,
   Swords,
 } from 'lucide-react';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
@@ -228,9 +226,9 @@ export default function ArcadeHub() {
 
   return (
     <div className="min-h-screen bg-[#07090F] text-slate-100">
-      {/* 3-Zone Top Bar */}
+      {/* Minimal Top Bar */}
       <header className="border-b border-slate-800/80 bg-[#07090F]/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-8 px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
           <Link
             href="/"
             className="font-display text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0"
@@ -238,93 +236,41 @@ export default function ArcadeHub() {
             Webcam Party Arcade
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-            <a
-              href="#games"
-              className="transition-colors hover:text-white whitespace-nowrap shrink-0"
-            >
-              Games
-            </a>
-            <a
-              href="#calibration"
-              className="transition-colors hover:text-white whitespace-nowrap shrink-0"
-            >
-              Camera Setup
-            </a>
-            <a
-              href="#rules"
-              className="transition-colors hover:text-white whitespace-nowrap shrink-0"
-            >
-              How to Play
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-3 shrink-0">
-            <Link
-              href="/games/neon-slash-duel"
-              className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-4 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap shrink-0"
-            >
-              <span>Play Neon Slash</span>
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </div>
+          <button
+            type="button"
+            onClick={() => void requestCamera()}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0E131E] px-3.5 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-400/60 hover:text-white whitespace-nowrap shrink-0"
+          >
+            <Camera className="h-3.5 w-3.5 text-cyan-400" aria-hidden="true" />
+            <span>{cameraStatus === 'active' ? 'Camera Ready' : 'Enable Webcam'}</span>
+          </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-7 sm:py-8">
+      <main className="mx-auto max-w-6xl px-6 py-6 sm:py-8">
         {/* Hero + Live Shared MediaPipe Preview */}
         <section
           id="calibration"
-          className="grid items-stretch gap-8 lg:grid-cols-12"
+          className="grid items-center gap-6 lg:grid-cols-12"
         >
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}
-            className="flex flex-col justify-between lg:col-span-6"
+            className="flex flex-col justify-center lg:col-span-6"
           >
-            <div>
-              <h1 className="font-display text-4xl font-extrabold tracking-tight text-white sm:text-5xl text-balance">
-                Turn one webcam into a local multiplayer arcade.
-              </h1>
-              <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-300">
-                Shared MediaPipe hand tracking initializes once at the hub and stays warm as you jump into 60FPS HTML5 Canvas duels. Step in front of the lens with a friend—left side is Blue, right side is Crimson.
-              </p>
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl text-balance">
+              One webcam. Solo runs or 1v1 party duels.
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">
+              Pick a game below to play 1P Solo or battle a friend side-by-side—no webcam required to test with mouse or fallback controls.
+            </p>
 
-              <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/games/neon-slash-duel"
-                  className="inline-flex items-center gap-2 rounded-lg bg-cyan-400 px-6 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap shrink-0"
-                >
-                  <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-                  <span>Play Neon Slash Duel</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => void requestCamera()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0E131E] px-5 py-3 text-sm font-semibold text-slate-200 transition-colors hover:border-cyan-400/60 hover:text-white whitespace-nowrap shrink-0"
-                >
-                  <Camera className="h-4 w-4 text-cyan-400" aria-hidden="true" />
-                  <span>
-                    {cameraStatus === 'active' ? 'Camera Ready' : 'Enable Webcam'}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-8 border-t border-slate-800/80 pt-5">
-              <div className="text-sm font-medium text-slate-200">{statusText}</div>
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+              <span className="font-medium text-slate-200">{statusText}</span>
               {errorMessage && cameraStatus !== 'active' && (
-                <p className="mt-1 text-xs text-slate-400">{errorMessage}</p>
+                <span className="text-slate-400">· {errorMessage}</span>
               )}
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono">
-                <span>4-Hand Tracking</span>
-                <span aria-hidden="true">·</span>
-                <span>60FPS Canvas Loop</span>
-                <span aria-hidden="true">·</span>
-                <span>Zero Server Latency</span>
-              </div>
             </div>
           </motion.div>
 
@@ -335,13 +281,13 @@ export default function ArcadeHub() {
             transition={{ duration: 0.25, delay: 0.05 }}
             className="flex flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#0E131E] lg:col-span-6"
           >
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5 text-xs text-slate-300">
-              <span className="font-semibold text-white">Live Arena Preview</span>
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2 text-xs text-slate-300">
+              <span className="font-semibold text-white">Live Camera Calibration</span>
               <span className="font-mono text-slate-400">
                 {cameraStatus === 'active' ? 'Webcam Feed' : 'Interactive Grid'}
               </span>
             </div>
-            <div className="relative flex-1 min-h-[260px]">
+            <div className="relative min-h-[220px]">
               <canvas
                 ref={previewCanvasRef}
                 onPointerMove={handlePreviewMove}
@@ -424,7 +370,7 @@ export default function ArcadeHub() {
                   <div className="flex items-center gap-2 text-xs text-slate-400">
                     <span className="font-semibold text-cyan-300">Playable</span>
                     <span aria-hidden="true">·</span>
-                    <span>2 Players</span>
+                    <span>1–2 Players</span>
                     <span aria-hidden="true">·</span>
                     <span>60s Match</span>
                   </div>
@@ -432,7 +378,7 @@ export default function ArcadeHub() {
                     Neon Slash Duel
                   </h3>
                   <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                    Slice your side&apos;s geometric gems with glowing fingertip laser blades, dodge Skull Bombs, and trigger purple Sabotage Orbs to glitch your rival&apos;s screen.
+                    Slice geometric gems with laser blades, dodge Skull Bombs, and race solo or 1v1 with Sabotage Orbs.
                   </p>
                 </div>
               </div>
@@ -563,46 +509,6 @@ export default function ArcadeHub() {
                 </button>
               </div>
             </article>
-          </div>
-        </section>
-
-        {/* Concise Rules & Setup Section */}
-        <section id="rules" className="mt-14 border-t border-slate-800/80 pt-10">
-          <div className="flex items-center gap-2.5 text-white">
-            <SlidersHorizontal className="h-5 w-5 text-cyan-400" aria-hidden="true" />
-            <h2 className="font-display text-xl font-bold">How the Arena Works</h2>
-          </div>
-
-          <div className="mt-6 grid gap-6 md:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-[#0E131E] p-5">
-              <div className="font-mono text-xs font-bold text-cyan-400">01. Split Field</div>
-              <h3 className="mt-1.5 font-display text-base font-bold text-white">
-                Two Sides, One Camera
-              </h3>
-              <p className="mt-1.5 text-sm text-slate-300">
-                Up to 4 hands are tracked simultaneously. Hands on the left half wield Blue blades (P1); hands on the right wield Crimson blades (P2).
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-800 bg-[#0E131E] p-5">
-              <div className="font-mono text-xs font-bold text-rose-400">02. Combo Multiplier</div>
-              <h3 className="mt-1.5 font-display text-base font-bold text-white">
-                Chain Clean Slices
-              </h3>
-              <p className="mt-1.5 text-sm text-slate-300">
-                Slice your own color gems consecutively within 1.8 seconds to climb up to a 5x multiplier. Hitting Skull Bombs (-25) or enemy gems (-10) breaks your streak.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-slate-800 bg-[#0E131E] p-5">
-              <div className="font-mono text-xs font-bold text-purple-400">03. Sabotage Orbs</div>
-              <h3 className="mt-1.5 font-display text-base font-bold text-white">
-                Disrupt Your Rival
-              </h3>
-              <p className="mt-1.5 text-sm text-slate-300">
-                Purple Sabotage Orbs award +15 points and scramble your opponent&apos;s half of the screen with static glitch interference for 3 seconds.
-              </p>
-            </div>
           </div>
         </section>
       </main>

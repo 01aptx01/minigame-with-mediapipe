@@ -140,4 +140,25 @@ test('simulation spawns parabolic targets, ticks down 60s timer, and transitions
   assert.equal(determineWinner(120, 90), 'p1');
   assert.equal(determineWinner(40, 90), 'p2');
   assert.equal(determineWinner(50, 50), 'draw');
+  assert.equal(determineWinner(150, 0, 'solo'), 'solo');
+});
+
+test('solo mode routes full canvas to p1 and spawns only p1 gems or skull bombs', () => {
+  const state = createInitialGameState('playing', 'solo');
+  assert.equal(getPlayerSideForX(980, 1000, 'solo'), 'p1');
+  assert.equal(getPlayerSideForX(20, 1000, 'solo'), 'p1');
+
+  let seed = 0.31;
+  const rng = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+
+  for (let i = 0; i < 30; i++) {
+    stepGameSimulation(state, 0.05, 1280, 720, rng);
+  }
+  assert.ok(state.targets.length > 0);
+  for (const t of state.targets) {
+    assert.ok(t.kind === 'p1_gem' || t.kind === 'skull_bomb');
+  }
 });

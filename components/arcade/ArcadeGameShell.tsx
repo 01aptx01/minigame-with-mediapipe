@@ -26,6 +26,9 @@ interface ArcadeGameShellProps {
   isMuted: boolean;
   initialDurationSec?: number;
   soloMode?: boolean;
+  hideTugBar?: boolean;
+  p1Label?: string;
+  p2Label?: string;
   canvasTestId: string;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   sizeRef: React.MutableRefObject<{ width: number; height: number }>;
@@ -45,6 +48,9 @@ export function ArcadeGameShell({
   isMuted,
   initialDurationSec = 60,
   soloMode = false,
+  hideTugBar = false,
+  p1Label,
+  p2Label,
   canvasTestId,
   canvasRef,
   sizeRef,
@@ -126,6 +132,17 @@ export function ArcadeGameShell({
   // Shared keyboard shortcuts: Enter/Space start, P/Esc pause, M mute, R restart
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        if (e.key === 'Enter' && phase === 'title') {
+          e.preventDefault();
+          onStart();
+        }
+        return;
+      }
+
       const key = e.key.toLowerCase();
 
       if ((key === 'enter' || key === ' ') && phase === 'title') {
@@ -201,8 +218,8 @@ export function ArcadeGameShell({
             </Link>
 
             <div className="flex items-baseline gap-2.5 rounded-lg border border-cyan-500/30 bg-[#0D121D]/90 px-3.5 py-1.5">
-              <span className="text-[11px] font-bold tracking-wider text-cyan-400 uppercase">
-                {soloMode ? 'SOLO' : 'P1'}
+              <span className="max-w-28 truncate text-[11px] font-bold tracking-wider text-cyan-400 uppercase">
+                {p1Label || (soloMode ? 'SOLO' : 'P1')}
               </span>
               <span
                 ref={p1ScoreTextRef}
@@ -259,8 +276,8 @@ export function ArcadeGameShell({
                 >
                   0
                 </span>
-                <span className="text-[11px] font-bold tracking-wider text-rose-400 uppercase">
-                  P2
+                <span className="max-w-28 truncate text-[11px] font-bold tracking-wider text-rose-400 uppercase">
+                  {p2Label || 'P2'}
                 </span>
               </div>
             )}
@@ -320,23 +337,25 @@ export function ArcadeGameShell({
         </div>
 
         {/* Shared Cyber Tug-of-War Bar */}
-        <div
-          aria-label="Tug-of-war score bar"
-          className={`relative mx-auto h-2.5 w-full max-w-2xl overflow-hidden rounded-full border border-slate-700/80 ${
-            soloMode ? 'bg-slate-800/90' : 'bg-rose-600/85'
-          }`}
-        >
+        {!hideTugBar && (
           <div
-            ref={tugP1BarRef}
-            style={{ width: soloMode ? '0%' : '50%' }}
-            className="h-full bg-cyan-400 transition-[width] duration-75"
-          />
-          <div
-            ref={tugDividerRef}
-            style={{ left: soloMode ? '80%' : '50%' }}
-            className="absolute top-0 h-full w-1 -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]"
-          />
-        </div>
+            aria-label="Tug-of-war score bar"
+            className={`relative mx-auto h-2.5 w-full max-w-2xl overflow-hidden rounded-full border border-slate-700/80 ${
+              soloMode ? 'bg-slate-800/90' : 'bg-rose-600/85'
+            }`}
+          >
+            <div
+              ref={tugP1BarRef}
+              style={{ width: soloMode ? '0%' : '50%' }}
+              className="h-full bg-cyan-400 transition-[width] duration-75"
+            />
+            <div
+              ref={tugDividerRef}
+              style={{ left: soloMode ? '80%' : '50%' }}
+              className="absolute top-0 h-full w-1 -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]"
+            />
+          </div>
+        )}
       </header>
 
       {/* Optional Bottom Interactive Controls */}

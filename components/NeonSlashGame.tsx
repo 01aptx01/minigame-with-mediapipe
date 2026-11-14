@@ -3,13 +3,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Camera, Play } from 'lucide-react';
+import { Camera, Play, User, Users } from 'lucide-react';
 import {
   ArcadeGameShell,
   type ArcadeHudHandle,
 } from '@/components/arcade/ArcadeGameShell';
+import { LeaderboardPanel } from '@/components/arcade/LeaderboardPanel';
+import { PlayerNameInputs } from '@/components/arcade/PlayerNameInputs';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
 import { ArcadeAudioEngine } from '@/lib/games/shared/audio';
+import {
+  clearScoreboard,
+  loadScoreboard,
+  normalizePlayerName,
+  recordMatchToScoreboard,
+  saveScoreboard,
+  type ScoreboardEntry,
+} from '@/lib/games/shared/scoreboard';
 import {
   applySliceOutcome,
   computeTugOfWarRatio,
@@ -30,6 +40,7 @@ import type {
   HandBlade,
   Particle,
   PlayerId,
+  SlashGameMode,
   Target,
 } from '@/lib/games/neon-slash/types';
 
@@ -70,20 +81,26 @@ export default function NeonSlashGame() {
   const initialPhase: GamePhase = autostart ? 'playing' : 'title';
 
   // 60FPS simulation refs
-  const gameStateRef = useRef<GameState>(createInitialGameState(initialPhase));
+  const gameStateRef = useRef<GameState>(createInitialGameState(initialPhase, '1v1'));
   const particlesRef = useRef<Particle[]>(createParticlePool());
   const particleCursorRef = useRef<number>(0);
   const bladesRef = useRef<Map<string, HandBlade>>(new Map());
   const pointerBladeDownRef = useRef<boolean>(false);
   const lastPointerPosRef = useRef<{ x: number; y: number } | null>(null);
   const audioRef = useRef<ArcadeAudioEngine | null>(null);
+  const namesRef = useRef<{ p1: string; p2: string }>({ p1: '', p2: '' });
 
   const hudHandleRef = useRef<ArcadeHudHandle | null>(null);
 
   // Discrete React UI states
   const [phase, setPhase] = useState<GamePhase>(initialPhase);
+  const [mode, setMode] = useState<SlashGameMode>('1v1');
+  const [p1Name, setP1Name] = useState<string>('');
+  const [p2Name, setP2Name] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [endSummary, setEndSummary] = useState<EndGameSummary | null>(null);
+  const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([]);
+  const [newEntryIds, setNewEntryIds] = useState<string[]>([]);
 
   const syncHudDom = useCallback((state: GameState) => {
     hudHandleRef.current?.updateHud({
@@ -186,20 +203,48 @@ export default function NeonSlashGame() {
     [spawnParticleBurst]
   );
 
-  const startNewRound = useCallback(() => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
+  const startNewRound = useCallback(
+    (overrideMode?: SlashGameMode) => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      const nextMode = overrideMode ?? mode;
+      const fresh = createInitialGameState('playing', nextMode);
+      gameStateRef.current = fresh;
+      particlesRef.current.forEach((p) => {
+        p.active = false;
+      });
+      bladesRef.current.clear();
+      setEndSummary(null);
+      setNewEntryIds([]);
+      setPhase('playing');
+      syncHudDom(fresh);
+    },
+    [mode, syncHudDom]
+  );
+
+  const handleModeChange = useCallback((nextMode: SlashGameMode) => {
+    setMode(nextMode);
+    if (gameStateRef.current.phase === 'title') {
+      gameStateRef.current.mode = nextMode;
     }
-    const fresh = createInitialGameState('playing');
-    gameStateRef.current = fresh;
-    particlesRef.current.forEach((p) => {
-      p.active = false;
-    });
-    bladesRef.current.clear();
-    setEndSummary(null);
-    setPhase('playing');
-    syncHudDom(fresh);
-  }, [syncHudDom]);
+  }, []);
+
+  const handleP1NameChange = useCallback((val: string) => {
+    setP1Name(val);
+    namesRef.current.p1 = val;
+  }, []);
+
+  const handleP2NameChange = useCallback((val: string) => {
+    setP2Name(val);
+    namesRef.current.p2 = val;
+  }, []);
+
+  const handleClearScoreboard = useCallback(() => {
+    clearScoreboard('neon-slash-duel');
+    setScoreboard([]);
+    setNewEntryIds([]);
+  }, []);
 
   const togglePause = useCallback(() => {
     const current = gameStateRef.current.phase;
@@ -240,7 +285,7 @@ export default function NeonSlashGame() {
     const pushPointerPoint = (x: number, y: number, checkSlice: boolean) => {
       const now = performance.now();
       const { width } = sizeRef.current;
-      const side = getPlayerSideForX(x, width);
+      const side = getPlayerSideForX(x, width, gameStateRef.current.mode);
       const bladeKey = 'pointer';
       let blade = bladesRef.current.get(bladeKey);
       if (!blade) {
@@ -501,7 +546,7 @@ export default function NeonSlashGame() {
           if (!tip) return;
 
           const { x, y } = projectLandmarkToCanvas(tip, width, height, true);
-          const player = getPlayerSideForX(x, width);
+          const player = getPlayerSideForX(x, width, state.mode);
           const handKey = `hand_${handIdx}`;
 
           let blade = bladesRef.current.get(handKey);
@@ -555,9 +600,49 @@ export default function NeonSlashGame() {
       }
       if (simOutcome.roundEnded) {
         audioRef.current?.playRoundEnd();
+        const p1Label = normalizePlayerName(
+          namesRef.current.p1,
+          state.mode === 'solo' ? 'Solo Player' : 'Player 1'
+        );
+        const p2Label = normalizePlayerName(namesRef.current.p2, 'Player 2');
+        const incoming =
+          state.mode === 'solo'
+            ? [
+                {
+                  game: 'neon-slash-duel' as const,
+                  mode: 'solo' as const,
+                  name: p1Label,
+                  score: state.p1.score,
+                  detail: `${state.p1.maxCombo}x max`,
+                },
+              ]
+            : [
+                {
+                  game: 'neon-slash-duel' as const,
+                  mode: '1v1' as const,
+                  name: p1Label,
+                  score: state.p1.score,
+                  detail: `${state.p1.maxCombo}x max`,
+                },
+                {
+                  game: 'neon-slash-duel' as const,
+                  mode: '1v1' as const,
+                  name: p2Label,
+                  score: state.p2.score,
+                  detail: `${state.p2.maxCombo}x max`,
+                },
+              ];
+
+        const existing = loadScoreboard('neon-slash-duel');
+        const { entries, addedIds } = recordMatchToScoreboard(existing, incoming);
+        saveScoreboard('neon-slash-duel', entries);
+        setScoreboard(entries);
+        setNewEntryIds(addedIds);
+
         setPhase('gameover');
         setEndSummary({
-          winner: determineWinner(state.p1.score, state.p2.score),
+          winner: determineWinner(state.p1.score, state.p2.score, state.mode),
+          mode: state.mode,
           p1: { ...state.p1 },
           p2: { ...state.p2 },
         });
@@ -632,36 +717,45 @@ export default function NeonSlashGame() {
         }
       }
 
-      const p1Wash = ctx.createLinearGradient(0, 0, width * 0.5, 0);
-      p1Wash.addColorStop(0, 'rgba(0, 229, 255, 0.08)');
-      p1Wash.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
-      ctx.fillStyle = p1Wash;
-      ctx.fillRect(0, 0, width * 0.5, height);
+      if (state.mode === '1v1') {
+        const p1Wash = ctx.createLinearGradient(0, 0, width * 0.5, 0);
+        p1Wash.addColorStop(0, 'rgba(0, 229, 255, 0.08)');
+        p1Wash.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+        ctx.fillStyle = p1Wash;
+        ctx.fillRect(0, 0, width * 0.5, height);
 
-      const p2Wash = ctx.createLinearGradient(width * 0.5, 0, width, 0);
-      p2Wash.addColorStop(0, 'rgba(255, 42, 109, 0.0)');
-      p2Wash.addColorStop(1, 'rgba(255, 42, 109, 0.08)');
-      ctx.fillStyle = p2Wash;
-      ctx.fillRect(width * 0.5, 0, width * 0.5, height);
+        const p2Wash = ctx.createLinearGradient(width * 0.5, 0, width, 0);
+        p2Wash.addColorStop(0, 'rgba(255, 42, 109, 0.0)');
+        p2Wash.addColorStop(1, 'rgba(255, 42, 109, 0.08)');
+        ctx.fillStyle = p2Wash;
+        ctx.fillRect(width * 0.5, 0, width * 0.5, height);
 
-      ctx.save();
-      ctx.strokeStyle = 'rgba(226, 232, 240, 0.22)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 10]);
-      ctx.beginPath();
-      ctx.moveTo(width * 0.5, 68);
-      ctx.lineTo(width * 0.5, height);
-      ctx.stroke();
-      ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.22)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 10]);
+        ctx.beginPath();
+        ctx.moveTo(width * 0.5, 68);
+        ctx.lineTo(width * 0.5, height);
+        ctx.stroke();
+        ctx.restore();
 
-      ctx.save();
-      ctx.font = '700 12px "JetBrains Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(0, 229, 255, 0.52)';
-      ctx.fillText('P1 ZONE · CYAN', width * 0.25, height - 18);
-      ctx.fillStyle = 'rgba(255, 42, 109, 0.52)';
-      ctx.fillText('P2 ZONE · CRIMSON', width * 0.75, height - 18);
-      ctx.restore();
+        ctx.save();
+        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.52)';
+        ctx.fillText('P1 ZONE · CYAN', width * 0.25, height - 18);
+        ctx.fillStyle = 'rgba(255, 42, 109, 0.52)';
+        ctx.fillText('P2 ZONE · CRIMSON', width * 0.75, height - 18);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.52)';
+        ctx.fillText('SOLO ARENA · SLICE CYAN GEMS · DODGE BOMBS', width * 0.5, height - 18);
+        ctx.restore();
+      }
 
       for (const h of state.slicedHalves) {
         ctx.save();
@@ -785,10 +879,16 @@ export default function NeonSlashGame() {
       ? 'Requesting Camera Access...'
       : 'Pointer Blade Mode Active (No Webcam)';
 
+  const resolvedP1Name = normalizePlayerName(
+    p1Name,
+    mode === 'solo' ? 'Solo Player' : 'Player 1'
+  );
+  const resolvedP2Name = normalizePlayerName(p2Name, 'Player 2');
+
   const titleOverlay = (
-    <div className="w-full max-w-xl rounded-2xl border border-slate-700/80 bg-[#0D121E] p-7 shadow-2xl">
+    <div className="w-full max-w-lg rounded-2xl border border-slate-700/80 bg-[#0D121E] p-6 shadow-2xl">
       <div className="flex flex-col items-center text-center">
-        <svg viewBox="0 0 120 44" className="mb-3 h-11 w-28" aria-hidden="true">
+        <svg viewBox="0 0 120 44" className="mb-2.5 h-10 w-24" aria-hidden="true">
           <path d="M14 34 L52 10" stroke="#00E5FF" strokeWidth="4" strokeLinecap="round" />
           <path d="M106 34 L68 10" stroke="#FF2A6D" strokeWidth="4" strokeLinecap="round" />
           <polygon
@@ -799,33 +899,65 @@ export default function NeonSlashGame() {
           />
         </svg>
 
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">
           Neon Slash Duel
         </h1>
-        <p className="mt-2 max-w-md text-sm text-slate-300">
-          Two-player webcam laser battle. Left half is Blue (P1), right half is Crimson (P2). Slice your own gems fast to build 5x combos.
+        <p className="mt-1.5 text-xs text-slate-300 sm:text-sm">
+          {mode === 'solo'
+            ? 'Slice Cyan gems across the full arena and dodge Skull Bombs.'
+            : 'Left half is Cyan (P1), right half is Crimson (P2).'}
         </p>
 
-        <div className="mt-6 grid w-full grid-cols-2 gap-3 text-left text-xs sm:grid-cols-4">
-          <div className="rounded-lg border border-cyan-500/30 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-cyan-300">Own Gem</div>
-            <div className="mt-0.5 font-mono text-slate-300">+10 × Combo</div>
-          </div>
-          <div className="rounded-lg border border-rose-500/30 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-rose-300">Enemy Gem</div>
-            <div className="mt-0.5 font-mono text-slate-300">-10 Penalty</div>
-          </div>
-          <div className="rounded-lg border border-amber-500/35 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-amber-300">Skull Bomb</div>
-            <div className="mt-0.5 font-mono text-slate-300">-25 &amp; Reset</div>
-          </div>
-          <div className="rounded-lg border border-purple-500/40 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-purple-300">Sabotage Orb</div>
-            <div className="mt-0.5 font-mono text-slate-300">Glitch 3.0s</div>
-          </div>
+        {/* Mode Toggle: 1v1 vs 1P Solo */}
+        <div
+          role="group"
+          aria-label="Game mode"
+          className="mt-4 inline-flex rounded-lg border border-slate-700 bg-[#080C15] p-1"
+        >
+          <button
+            type="button"
+            onClick={() => handleModeChange('1v1')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
+              mode === '1v1'
+                ? 'bg-cyan-400 text-slate-950'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>1v1 Split Duel</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('solo')}
+            className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
+              mode === 'solo'
+                ? 'bg-cyan-400 text-slate-950'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <User className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>1P Solo</span>
+          </button>
         </div>
 
-        <div className="mt-5 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090D16] px-4 py-2.5 text-xs text-slate-300">
+        {/* Optional Player Name Inputs */}
+        <PlayerNameInputs
+          soloMode={mode === 'solo'}
+          p1Name={p1Name}
+          p2Name={p2Name}
+          onChangeP1Name={handleP1NameChange}
+          onChangeP2Name={handleP2NameChange}
+        />
+
+        {/* Compact Single-Line Scoring Key */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[11px] text-slate-300">
+          <span className="text-cyan-300">Gem +10×Combo</span>
+          {mode === '1v1' && <span className="text-rose-300">Enemy -10</span>}
+          <span className="text-amber-300">Bomb -25</span>
+          {mode === '1v1' && <span className="text-purple-300">Orb 3s Glitch</span>}
+        </div>
+
+        <div className="mt-4 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090D16] px-3.5 py-2 text-xs text-slate-300">
           <span>{cameraReadyLabel}</span>
           {cameraStatus !== 'active' && (
             <button
@@ -839,81 +971,90 @@ export default function NeonSlashGame() {
           )}
         </div>
         {errorMessage && cameraStatus !== 'active' && (
-          <p className="mt-2 text-xs text-slate-400">{errorMessage}</p>
+          <p className="mt-1.5 text-xs text-slate-400">{errorMessage}</p>
         )}
 
-        <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row sm:justify-center">
+        <div className="mt-5 flex w-full justify-center">
           <button
             type="button"
             data-start="true"
-            onClick={startNewRound}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-400 px-7 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 whitespace-nowrap shrink-0"
+            onClick={() => startNewRound()}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 sm:w-auto whitespace-nowrap"
           >
             <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-            <span>Start 60s Duel</span>
+            <span>{mode === 'solo' ? 'Start 60s Solo Run' : 'Start 60s Duel'}</span>
           </button>
         </div>
-
-        <p className="mt-5 text-xs text-slate-400">
-          Index Fingers (Webcam) or Drag Pointer · Enter Start · P Pause · M Mute
-        </p>
       </div>
     </div>
   );
 
   const endOverlay = endSummary ? (
-    <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#0D121E] p-7 text-center shadow-2xl">
-      <h2 className="font-display text-3xl font-extrabold text-white">
+    <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-[#0D121E] p-6 text-center shadow-2xl">
+      <h2 className="font-display text-2xl font-extrabold text-white sm:text-3xl">
         {endSummary.winner === 'p1'
-          ? 'Player 1 Wins'
+          ? `${resolvedP1Name} Wins`
           : endSummary.winner === 'p2'
-          ? 'Player 2 Wins'
+          ? `${resolvedP2Name} Wins`
+          : endSummary.winner === 'solo'
+          ? `${resolvedP1Name} · Run Complete`
           : 'Draw Match'}
       </h2>
-      <p className="mt-1 text-sm text-slate-400">60-second duel complete</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 text-left">
-        <div className="rounded-xl border border-cyan-500/35 bg-[#090E18] p-4">
-          <div className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
-            P1 · Cyan
+      <div
+        className={`mt-4 grid gap-3 text-left ${
+          endSummary.mode === 'solo' ? 'grid-cols-1' : 'grid-cols-2'
+        }`}
+      >
+        <div className="rounded-xl border border-cyan-500/35 bg-[#090E18] p-3.5">
+          <div className="truncate text-xs font-bold tracking-wider text-cyan-400 uppercase">
+            {resolvedP1Name}
           </div>
-          <div className="mt-1 font-mono text-3xl font-bold text-white tabular-nums">
+          <div className="mt-0.5 font-mono text-3xl font-bold text-white tabular-nums">
             {endSummary.p1.score}
           </div>
-          <div className="mt-2 space-y-1 text-xs text-slate-300 font-mono tabular-nums">
-            <div>Slices: {endSummary.p1.ownSlices}</div>
-            <div>Max Combo: {endSummary.p1.maxCombo}</div>
-            <div>Sabotages: {endSummary.p1.sabotagesSent}</div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300 font-mono tabular-nums">
+            <span>Slices {endSummary.p1.ownSlices}</span>
+            <span>Max {endSummary.p1.maxCombo}x</span>
+            {endSummary.mode === '1v1' && <span>Glitch {endSummary.p1.sabotagesSent}</span>}
           </div>
         </div>
 
-        <div className="rounded-xl border border-rose-500/35 bg-[#090E18] p-4">
-          <div className="text-xs font-bold tracking-wider text-rose-400 uppercase">
-            P2 · Crimson
+        {endSummary.mode === '1v1' && (
+          <div className="rounded-xl border border-rose-500/35 bg-[#090E18] p-3.5">
+            <div className="truncate text-xs font-bold tracking-wider text-rose-400 uppercase">
+              {resolvedP2Name}
+            </div>
+            <div className="mt-0.5 font-mono text-3xl font-bold text-white tabular-nums">
+              {endSummary.p2.score}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300 font-mono tabular-nums">
+              <span>Slices {endSummary.p2.ownSlices}</span>
+              <span>Max {endSummary.p2.maxCombo}x</span>
+              <span>Glitch {endSummary.p2.sabotagesSent}</span>
+            </div>
           </div>
-          <div className="mt-1 font-mono text-3xl font-bold text-white tabular-nums">
-            {endSummary.p2.score}
-          </div>
-          <div className="mt-2 space-y-1 text-xs text-slate-300 font-mono tabular-nums">
-            <div>Slices: {endSummary.p2.ownSlices}</div>
-            <div>Max Combo: {endSummary.p2.maxCombo}</div>
-            <div>Sabotages: {endSummary.p2.sabotagesSent}</div>
-          </div>
-        </div>
+        )}
       </div>
 
-      <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+      <LeaderboardPanel
+        entries={scoreboard}
+        highlightIds={newEntryIds}
+        onClear={handleClearScoreboard}
+      />
+
+      <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
           data-start="true"
-          onClick={startNewRound}
-          className="flex-1 rounded-lg bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap"
+          onClick={() => startNewRound()}
+          className="flex-1 rounded-lg bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap"
         >
-          Replay Duel
+          {endSummary.mode === 'solo' ? 'Play Again' : 'Replay Duel'}
         </button>
         <Link
           href="/"
-          className="flex-1 rounded-lg border border-slate-700 bg-[#121929] px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
+          className="flex-1 rounded-lg border border-slate-700 bg-[#121929] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
         >
           Back to Hub
         </Link>
@@ -926,14 +1067,18 @@ export default function NeonSlashGame() {
       phase={phase}
       isMuted={isMuted}
       initialDurationSec={ROUND_DURATION_SEC}
+      soloMode={mode === 'solo'}
+      hideTugBar={mode === 'solo'}
+      p1Label={p1Name.trim() || undefined}
+      p2Label={p2Name.trim() || undefined}
       canvasTestId="neon-slash-canvas"
       canvasRef={canvasRef}
       sizeRef={sizeRef}
       hudHandleRef={hudHandleRef}
-      onStart={startNewRound}
+      onStart={() => startNewRound()}
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
-      onRestart={startNewRound}
+      onRestart={() => startNewRound()}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
     />

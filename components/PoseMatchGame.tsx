@@ -8,8 +8,18 @@ import {
   ArcadeGameShell,
   type ArcadeHudHandle,
 } from '@/components/arcade/ArcadeGameShell';
+import { LeaderboardPanel } from '@/components/arcade/LeaderboardPanel';
+import { PlayerNameInputs } from '@/components/arcade/PlayerNameInputs';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
 import { ArcadeAudioEngine } from '@/lib/games/shared/audio';
+import {
+  clearScoreboard,
+  loadScoreboard,
+  normalizePlayerName,
+  recordMatchToScoreboard,
+  saveScoreboard,
+  type ScoreboardEntry,
+} from '@/lib/games/shared/scoreboard';
 import {
   assignPoseToZone,
   computePoseTugRatio,
@@ -95,12 +105,17 @@ export default function PoseMatchGame() {
   });
 
   const hudHandleRef = useRef<ArcadeHudHandle | null>(null);
+  const namesRef = useRef<{ p1: string; p2: string }>({ p1: '', p2: '' });
 
   // Discrete React UI states
   const [phase, setPhase] = useState<PoseGamePhase>(initialPhase);
   const [mode, setMode] = useState<PoseGameMode>('1v1');
+  const [p1Name, setP1Name] = useState<string>('');
+  const [p2Name, setP2Name] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [endSummary, setEndSummary] = useState<PoseEndSummary | null>(null);
+  const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([]);
+  const [newEntryIds, setNewEntryIds] = useState<string[]>([]);
 
   // Lazily load PoseLandmarker model on mount
   useEffect(() => {
@@ -159,6 +174,7 @@ export default function PoseMatchGame() {
         p.active = false;
       });
       setEndSummary(null);
+      setNewEntryIds([]);
       setPhase('playing');
       syncHudDom(fresh);
     },
@@ -189,6 +205,22 @@ export default function PoseMatchGame() {
     if (gameStateRef.current.phase === 'title') {
       gameStateRef.current.mode = nextMode;
     }
+  }, []);
+
+  const handleP1NameChange = useCallback((val: string) => {
+    setP1Name(val);
+    namesRef.current.p1 = val;
+  }, []);
+
+  const handleP2NameChange = useCallback((val: string) => {
+    setP2Name(val);
+    namesRef.current.p2 = val;
+  }, []);
+
+  const handleClearScoreboard = useCallback(() => {
+    clearScoreboard('pose-match-battle');
+    setScoreboard([]);
+    setNewEntryIds([]);
   }, []);
 
   const triggerPuppetPose = useCallback((player: PlayerId, kind: PoseKind | null) => {
@@ -598,6 +630,45 @@ export default function PoseMatchGame() {
 
       if (sim.roundEnded) {
         audioRef.current?.playRoundEnd();
+        const p1Label = normalizePlayerName(
+          namesRef.current.p1,
+          state.mode === 'solo' ? 'Solo Player' : 'Player 1'
+        );
+        const p2Label = normalizePlayerName(namesRef.current.p2, 'Player 2');
+        const incoming =
+          state.mode === 'solo'
+            ? [
+                {
+                  game: 'pose-match-battle' as const,
+                  mode: 'solo' as const,
+                  name: p1Label,
+                  score: state.p1.score,
+                  detail: `${state.p1.posesMatched} poses`,
+                },
+              ]
+            : [
+                {
+                  game: 'pose-match-battle' as const,
+                  mode: '1v1' as const,
+                  name: p1Label,
+                  score: state.p1.score,
+                  detail: `${state.p1.posesMatched} poses`,
+                },
+                {
+                  game: 'pose-match-battle' as const,
+                  mode: '1v1' as const,
+                  name: p2Label,
+                  score: state.p2.score,
+                  detail: `${state.p2.posesMatched} poses`,
+                },
+              ];
+
+        const existing = loadScoreboard('pose-match-battle');
+        const { entries, addedIds } = recordMatchToScoreboard(existing, incoming);
+        saveScoreboard('pose-match-battle', entries);
+        setScoreboard(entries);
+        setNewEntryIds(addedIds);
+
         setPhase('gameover');
         setEndSummary({
           winner: determinePoseWinner(state.mode, state.p1.score, state.p2.score),
@@ -800,10 +871,16 @@ export default function PoseMatchGame() {
         : 'Webcam Active · Loading Pose Model...'
       : 'Pose Puppet Fallback Ready (No Webcam)';
 
+  const resolvedP1Name = normalizePlayerName(
+    p1Name,
+    mode === 'solo' ? 'Solo Player' : 'Player 1'
+  );
+  const resolvedP2Name = normalizePlayerName(p2Name, 'Player 2');
+
   const titleOverlay = (
-    <div className="w-full max-w-xl rounded-2xl border border-slate-700/80 bg-[#0D121E] p-7 shadow-2xl">
+    <div className="w-full max-w-lg rounded-2xl border border-slate-700/80 bg-[#0D121E] p-6 shadow-2xl">
       <div className="flex flex-col items-center text-center">
-        <svg viewBox="0 0 120 48" className="mb-3 h-12 w-28" aria-hidden="true">
+        <svg viewBox="0 0 120 48" className="mb-2.5 h-10 w-24" aria-hidden="true">
           <circle cx="36" cy="12" r="5" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
           <path
             d="M16 18 L36 22 L56 18 M36 22 L36 34 L24 46 M36 34 L48 46"
@@ -822,23 +899,23 @@ export default function PoseMatchGame() {
           />
         </svg>
 
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">
           Pose Match Battle
         </h1>
-        <p className="mt-2 max-w-md text-sm text-slate-300">
-          Hold 80%+ joint-angle accuracy against neon silhouette targets. Chain 3 poses to sabotage your rival, dodge red Fake-Outs, and dominate the 2x Overdrive finish.
+        <p className="mt-1.5 text-xs text-slate-300 sm:text-sm">
+          Hold 80%+ joint accuracy to score. Dodge red Fake-Outs &amp; win 2x Overdrive.
         </p>
 
         {/* Mode Toggle: 1v1 Race vs 1-Player Solo Arcade */}
         <div
           role="group"
           aria-label="Game mode"
-          className="mt-5 inline-flex rounded-lg border border-slate-700 bg-[#080C15] p-1"
+          className="mt-4 inline-flex rounded-lg border border-slate-700 bg-[#080C15] p-1"
         >
           <button
             type="button"
             onClick={() => handleModeChange('1v1')}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
               mode === '1v1'
                 ? 'bg-cyan-400 text-slate-950'
                 : 'text-slate-300 hover:text-white'
@@ -850,7 +927,7 @@ export default function PoseMatchGame() {
           <button
             type="button"
             onClick={() => handleModeChange('solo')}
-            className={`inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
               mode === 'solo'
                 ? 'bg-cyan-400 text-slate-950'
                 : 'text-slate-300 hover:text-white'
@@ -861,28 +938,24 @@ export default function PoseMatchGame() {
           </button>
         </div>
 
-        <div className="mt-5 grid w-full grid-cols-2 gap-3 text-left text-xs sm:grid-cols-4">
-          <div className="rounded-lg border border-cyan-500/30 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-cyan-300">8-Joint Match</div>
-            <div className="mt-0.5 font-mono text-slate-300">±30° Tolerance</div>
-          </div>
-          <div className="rounded-lg border border-emerald-500/30 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-emerald-300">Hold 80%+</div>
-            <div className="mt-0.5 font-mono text-slate-300">
-              {mode === '1v1' ? '1.5s to Score' : '2.0s to Score'}
-            </div>
-          </div>
-          <div className="rounded-lg border border-purple-500/35 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-purple-300">3x Combo</div>
-            <div className="mt-0.5 font-mono text-slate-300">Fog / Mirror 4s</div>
-          </div>
-          <div className="rounded-lg border border-amber-500/35 bg-[#0A0F1A] p-3">
-            <div className="font-semibold text-amber-300">Final 15s</div>
-            <div className="mt-0.5 font-mono text-slate-300">1.0s · 2x Pts</div>
-          </div>
+        <PlayerNameInputs
+          soloMode={mode === 'solo'}
+          p1Name={p1Name}
+          p2Name={p2Name}
+          onChangeP1Name={handleP1NameChange}
+          onChangeP2Name={handleP2NameChange}
+        />
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[11px] text-slate-300">
+          <span className="text-cyan-300">±30° Angle</span>
+          <span className="text-emerald-300">
+            Hold {mode === '1v1' ? '1.5s' : '2.0s'}
+          </span>
+          {mode === '1v1' && <span className="text-purple-300">3x Fog/Mirror</span>}
+          <span className="text-amber-300">Final 15s 2x</span>
         </div>
 
-        <div className="mt-5 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090D16] px-4 py-2.5 text-xs text-slate-300">
+        <div className="mt-4 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090D16] px-3.5 py-2 text-xs text-slate-300">
           <span>{statusText}</span>
           {cameraStatus !== 'active' && (
             <button
@@ -896,24 +969,20 @@ export default function PoseMatchGame() {
           )}
         </div>
         {errorMessage && cameraStatus !== 'active' && (
-          <p className="mt-2 text-xs text-slate-400">{errorMessage}</p>
+          <p className="mt-1.5 text-xs text-slate-400">{errorMessage}</p>
         )}
 
-        <div className="mt-6 flex w-full justify-center">
+        <div className="mt-5 flex w-full justify-center">
           <button
             type="button"
             data-start="true"
             onClick={() => startNewRound()}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-400 px-7 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 whitespace-nowrap shrink-0"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-6 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 sm:w-auto whitespace-nowrap"
           >
             <Play className="h-4 w-4 fill-current" aria-hidden="true" />
             <span>Start 60s Pose Battle</span>
           </button>
         </div>
-
-        <p className="mt-5 text-xs text-slate-400">
-          Full-Body Webcam or Practice Pose Buttons · Enter Start · P Pause · M Mute
-        </p>
       </div>
     </div>
   );
@@ -943,24 +1012,24 @@ export default function PoseMatchGame() {
     ) : null;
 
   const endOverlay = endSummary ? (
-    <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-[#0D121E] p-7 text-center shadow-2xl">
-      <h2 className="font-display text-3xl font-extrabold text-white">
+    <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-[#0D121E] p-6 text-center shadow-2xl">
+      <h2 className="font-display text-2xl font-extrabold text-white sm:text-3xl">
         {endSummary.winner === 'p1'
-          ? 'Player 1 Wins'
+          ? `${resolvedP1Name} Wins`
           : endSummary.winner === 'p2'
-          ? 'Player 2 Wins'
+          ? `${resolvedP2Name} Wins`
           : endSummary.winner === 'solo'
-          ? 'Solo Run Complete'
+          ? `${resolvedP1Name} · Run Complete`
           : 'Draw Match'}
       </h2>
-      <p className="mt-1 text-sm text-slate-400">60-second pose battle complete</p>
 
       {/* MVP Snapshot Card */}
       {endSummary.mvpSnapshot && (
-        <div className="mt-5 overflow-hidden rounded-xl border border-amber-500/40 bg-[#090D16] text-left">
-          <div className="flex items-center justify-between border-b border-slate-800 px-3.5 py-2 text-xs">
+        <div className="mt-4 overflow-hidden rounded-xl border border-amber-500/40 bg-[#090D16] text-left">
+          <div className="flex items-center justify-between border-b border-slate-800 px-3 py-1.5 text-xs">
             <span className="font-bold text-amber-300">
-              MVP Snapshot · {endSummary.mvpSnapshot.player.toUpperCase()}
+              MVP ·{' '}
+              {endSummary.mvpSnapshot.player === 'p1' ? resolvedP1Name : resolvedP2Name}
             </span>
             <span className="font-mono text-slate-300">
               {endSummary.mvpSnapshot.poseLabel} ({endSummary.mvpSnapshot.accuracy}% · +
@@ -971,59 +1040,65 @@ export default function PoseMatchGame() {
           <img
             src={endSummary.mvpSnapshot.dataUrl}
             alt={`MVP pose capture: ${endSummary.mvpSnapshot.poseLabel}`}
-            className="h-36 w-full object-cover"
+            className="h-28 w-full object-cover"
           />
         </div>
       )}
 
       <div
-        className={`mt-5 grid gap-3 text-left ${
+        className={`mt-4 grid gap-3 text-left ${
           endSummary.mode === 'solo' ? 'grid-cols-1' : 'grid-cols-2'
         }`}
       >
-        <div className="rounded-xl border border-cyan-500/35 bg-[#090E18] p-4">
-          <div className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
-            {endSummary.mode === 'solo' ? 'Solo · Cyan' : 'P1 · Cyan'}
+        <div className="rounded-xl border border-cyan-500/35 bg-[#090E18] p-3.5">
+          <div className="truncate text-xs font-bold tracking-wider text-cyan-400 uppercase">
+            {resolvedP1Name}
           </div>
-          <div className="mt-1 font-mono text-3xl font-bold text-white tabular-nums">
+          <div className="mt-0.5 font-mono text-3xl font-bold text-white tabular-nums">
             {endSummary.p1.score}
           </div>
-          <div className="mt-2 space-y-1 text-xs text-slate-300 font-mono tabular-nums">
-            <div>Poses Matched: {endSummary.p1.posesMatched}</div>
-            <div>Max Combo: {endSummary.p1.maxCombo}</div>
-            <div>Peak Accuracy: {endSummary.p1.peakAccuracy}%</div>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300 font-mono tabular-nums">
+            <span>Poses {endSummary.p1.posesMatched}</span>
+            <span>Max {endSummary.p1.maxCombo}x</span>
+            <span>Peak {endSummary.p1.peakAccuracy}%</span>
           </div>
         </div>
 
         {endSummary.mode === '1v1' && (
-          <div className="rounded-xl border border-rose-500/35 bg-[#090E18] p-4">
-            <div className="text-xs font-bold tracking-wider text-rose-400 uppercase">
-              P2 · Crimson
+          <div className="rounded-xl border border-rose-500/35 bg-[#090E18] p-3.5">
+            <div className="truncate text-xs font-bold tracking-wider text-rose-400 uppercase">
+              {resolvedP2Name}
             </div>
-            <div className="mt-1 font-mono text-3xl font-bold text-white tabular-nums">
+            <div className="mt-0.5 font-mono text-3xl font-bold text-white tabular-nums">
               {endSummary.p2.score}
             </div>
-            <div className="mt-2 space-y-1 text-xs text-slate-300 font-mono tabular-nums">
-              <div>Poses Matched: {endSummary.p2.posesMatched}</div>
-              <div>Max Combo: {endSummary.p2.maxCombo}</div>
-              <div>Peak Accuracy: {endSummary.p2.peakAccuracy}%</div>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-300 font-mono tabular-nums">
+              <span>Poses {endSummary.p2.posesMatched}</span>
+              <span>Max {endSummary.p2.maxCombo}x</span>
+              <span>Peak {endSummary.p2.peakAccuracy}%</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+      <LeaderboardPanel
+        entries={scoreboard}
+        highlightIds={newEntryIds}
+        onClear={handleClearScoreboard}
+      />
+
+      <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
         <button
           type="button"
           data-start="true"
           onClick={() => startNewRound()}
-          className="flex-1 rounded-lg bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap"
+          className="flex-1 rounded-lg bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300 whitespace-nowrap"
         >
           Play Again
         </button>
         <Link
           href="/"
-          className="flex-1 rounded-lg border border-slate-700 bg-[#121929] px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
+          className="flex-1 rounded-lg border border-slate-700 bg-[#121929] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
         >
           Back to Hub
         </Link>
@@ -1037,6 +1112,8 @@ export default function PoseMatchGame() {
       isMuted={isMuted}
       initialDurationSec={POSE_ROUND_DURATION_SEC}
       soloMode={mode === 'solo'}
+      p1Label={p1Name.trim() || undefined}
+      p2Label={p2Name.trim() || undefined}
       canvasTestId="pose-match-canvas"
       canvasRef={canvasRef}
       sizeRef={sizeRef}
