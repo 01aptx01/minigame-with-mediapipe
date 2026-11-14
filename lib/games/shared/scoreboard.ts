@@ -1,4 +1,9 @@
-export type GameSlug = 'neon-slash-duel' | 'pose-match-battle';
+export type GameSlug =
+  | 'neon-slash-duel'
+  | 'pose-match-battle'
+  | 'rhythm-dodge'
+  | 'sorcerers-duel'
+  | 'neon-muncher';
 export type ScoreboardMode = '1v1' | 'solo';
 
 export interface ScoreboardEntry {

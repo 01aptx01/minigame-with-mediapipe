@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import {
   Camera,
-  Lock,
   Play,
+  Smile,
+  Sparkles,
   Swords,
+  Zap,
 } from 'lucide-react';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
 import {
@@ -200,7 +202,7 @@ export default function ArcadeHub() {
     <div className="min-h-screen bg-[#07090F] text-slate-100">
       {/* Minimal Top Bar */}
       <header className="border-b border-slate-800/80 bg-[#07090F]/95">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3.5">
           <Link
             href="/"
             className="font-display text-lg font-bold tracking-tight text-white whitespace-nowrap shrink-0"
@@ -219,7 +221,7 @@ export default function ArcadeHub() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-6 sm:py-8">
+      <main className="mx-auto max-w-7xl px-6 py-5">
         {/* Hero + Live Shared MediaPipe Preview */}
         <section
           id="calibration"
@@ -231,14 +233,14 @@ export default function ArcadeHub() {
             transition={{ duration: 0.25 }}
             className="flex flex-col justify-center lg:col-span-6"
           >
-            <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl text-balance">
+            <h1 className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-[42px] lg:leading-[1.1] text-balance">
               One webcam. Solo runs or 1v1 party duels.
             </h1>
-            <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">
+            <p className="mt-2.5 max-w-lg text-sm leading-relaxed text-slate-300">
               Pick a game below to play 1P Solo or battle a friend side-by-side—no webcam required to test with mouse or fallback controls.
             </p>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-400">
               <span className="font-medium text-slate-200">{statusText}</span>
               {errorMessage && cameraStatus !== 'active' && (
                 <span className="text-slate-400">· {errorMessage}</span>
@@ -259,7 +261,7 @@ export default function ArcadeHub() {
                 {cameraStatus === 'active' ? 'Webcam Feed' : 'Interactive Grid'}
               </span>
             </div>
-            <div className="relative min-h-[220px]">
+            <div className="relative h-[200px]">
               <canvas
                 ref={previewCanvasRef}
                 onPointerMove={handlePreviewMove}
@@ -272,213 +274,219 @@ export default function ArcadeHub() {
         </section>
 
         {/* Game Cards Grid */}
-        <section id="games" className="mt-9">
-          <div className="flex items-baseline justify-between gap-4 border-b border-slate-800/80 pb-4">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-white">
-                Arcade Lineup
-              </h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Select a game mode to enter the arena.
-              </p>
-            </div>
-            <span className="text-xs font-mono text-slate-400">2 Playable · 1 In Development</span>
+        <section id="games" className="mt-6">
+          <div className="flex items-baseline justify-between gap-4 border-b border-slate-800/80 pb-3">
+            <h2 className="font-display text-xl font-bold text-white sm:text-2xl">
+              Arcade Lineup
+            </h2>
+            <span className="text-xs font-mono text-slate-400">5 Playable · Ready to Party</span>
           </div>
 
-          <div className="mt-6 grid gap-6 md:grid-cols-3">
+          <div className="mt-4 grid gap-3.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {/* Playable Card 1: Neon Slash Duel */}
             <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-cyan-500/40 bg-[#0E131E] transition-colors hover:border-cyan-400">
               <div>
-                <div className="relative h-36 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
-                  <svg
-                    viewBox="0 0 360 180"
-                    className="h-full w-full"
-                    aria-hidden="true"
-                  >
-                    <line
-                      x1="180"
-                      y1="0"
-                      x2="180"
-                      y2="180"
-                      stroke="rgba(148,163,184,0.22)"
-                      strokeDasharray="6 6"
-                    />
-                    <path
-                      d="M36 140 L144 48"
-                      stroke="#00E5FF"
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M324 140 L216 48"
-                      stroke="#FF2A6D"
-                      strokeWidth="5"
-                      strokeLinecap="round"
-                    />
-                    <polygon
-                      points="90,46 114,70 90,94 66,70"
-                      fill="rgba(0,229,255,0.22)"
-                      stroke="#00E5FF"
-                      strokeWidth="2.5"
-                    />
-                    <polygon
-                      points="270,46 294,70 270,94 246,70"
-                      fill="rgba(255,42,109,0.22)"
-                      stroke="#FF2A6D"
-                      strokeWidth="2.5"
-                    />
-                    <circle
-                      cx="180"
-                      cy="90"
-                      r="20"
-                      fill="rgba(168,85,247,0.28)"
-                      stroke="#C084FC"
-                      strokeWidth="2.5"
-                    />
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <line x1="180" y1="0" x2="180" y2="180" stroke="rgba(148,163,184,0.22)" strokeDasharray="6 6" />
+                    <path d="M36 140 L144 48" stroke="#00E5FF" strokeWidth="5" strokeLinecap="round" />
+                    <path d="M324 140 L216 48" stroke="#FF2A6D" strokeWidth="5" strokeLinecap="round" />
+                    <polygon points="90,46 114,70 90,94 66,70" fill="rgba(0,229,255,0.22)" stroke="#00E5FF" strokeWidth="2.5" />
+                    <polygon points="270,46 294,70 270,94 246,70" fill="rgba(255,42,109,0.22)" stroke="#FF2A6D" strokeWidth="2.5" />
+                    <circle cx="180" cy="90" r="20" fill="rgba(168,85,247,0.28)" stroke="#C084FC" strokeWidth="2.5" />
                   </svg>
                 </div>
 
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
                     <span className="font-semibold text-cyan-300">Playable</span>
                     <span aria-hidden="true">·</span>
-                    <span>1–2 Players</span>
+                    <span>1–2P</span>
                     <span aria-hidden="true">·</span>
-                    <span>60s Match</span>
+                    <span>60s Duel</span>
                   </div>
-                  <h3 className="mt-2 font-display text-xl font-bold text-white">
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
                     Neon Slash Duel
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                    Slice geometric gems with laser blades, dodge Skull Bombs, and race solo or 1v1 with Sabotage Orbs.
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Slice gems with fingertip laser blades, dodge Skull Bombs, and trigger 3s glitches.
                   </p>
                 </div>
               </div>
 
-              <div className="px-5 pb-5">
+              <div className="px-4 pb-4">
                 <Link
                   href="/games/neon-slash-duel"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-300"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-cyan-300"
                 >
-                  <Swords className="h-4 w-4" aria-hidden="true" />
+                  <Swords className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Play Neon Slash Duel</span>
                 </Link>
               </div>
             </article>
 
             {/* Playable Card 2: Pose Match Battle */}
-            <article
-              className="flex flex-col justify-between overflow-hidden rounded-xl border border-rose-500/40 bg-[#0E131E] transition-colors hover:border-rose-400"
-            >
+            <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-rose-500/40 bg-[#0E131E] transition-colors hover:border-rose-400">
               <div>
-                <div className="relative h-36 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
-                  <svg
-                    viewBox="0 0 360 180"
-                    className="h-full w-full"
-                    aria-hidden="true"
-                  >
-                    <line
-                      x1="180"
-                      y1="0"
-                      x2="180"
-                      y2="180"
-                      stroke="rgba(148,163,184,0.22)"
-                      strokeDasharray="6 6"
-                    />
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <line x1="180" y1="0" x2="180" y2="180" stroke="rgba(148,163,184,0.22)" strokeDasharray="6 6" />
                     <circle cx="100" cy="54" r="12" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
-                    <path
-                      d="M68 72 L100 84 L132 72 M100 84 L100 118 M100 118 L80 144 M100 118 L120 144"
-                      stroke="#00E5FF"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
+                    <path d="M68 72 L100 84 L132 72 M100 84 L100 118 M100 118 L80 144 M100 118 L120 144" stroke="#00E5FF" strokeWidth="3" strokeLinecap="round" fill="none" />
                     <circle cx="260" cy="54" r="12" stroke="#FF2A6D" strokeWidth="2.5" fill="none" />
-                    <path
-                      d="M232 56 L260 84 L288 56 M260 84 L260 118 M260 118 L242 144 M260 118 L278 144"
-                      stroke="#FF2A6D"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
+                    <path d="M232 56 L260 84 L288 56 M260 84 L260 118 M260 118 L242 144 M260 118 L278 144" stroke="#FF2A6D" strokeWidth="3" strokeLinecap="round" fill="none" />
                   </svg>
                 </div>
 
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
                     <span className="font-semibold text-rose-300">Playable</span>
                     <span aria-hidden="true">·</span>
-                    <span>1–2 Players</span>
+                    <span>1–2P</span>
                     <span aria-hidden="true">·</span>
-                    <span>60s Match</span>
+                    <span>2x Overdrive</span>
                   </div>
-                  <h3 className="mt-2 font-display text-xl font-bold text-white">
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
                     Pose Match Battle
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                    Match neon silhouette poses using 8-joint angle scoring. Trigger 3-combo sabotages, dodge red Fake-Outs, and win 2x Overdrive.
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Match neon silhouette poses using 8-joint angle scoring and dodge red Fake-Outs.
                   </p>
                 </div>
               </div>
 
-              <div className="px-5 pb-5">
+              <div className="px-4 pb-4">
                 <Link
                   href="/games/pose-match-battle"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-rose-400"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-rose-400"
                 >
-                  <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                  <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                   <span>Play Pose Match Battle</span>
                 </Link>
               </div>
             </article>
 
-            {/* Disabled Card 3: Rhythm Dodge */}
-            <article
-              className="flex flex-col justify-between overflow-hidden rounded-xl border border-slate-800 bg-[#0B0F19] opacity-80"
-            >
+            {/* Playable Card 3: Rhythm Dodge */}
+            <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-amber-500/40 bg-[#0E131E] transition-colors hover:border-amber-400">
               <div>
-                <div className="relative h-36 w-full overflow-hidden border-b border-slate-800 bg-[#080B12]">
-                  <svg
-                    viewBox="0 0 360 180"
-                    className="h-full w-full"
-                    aria-hidden="true"
-                  >
-                    <line x1="90" y1="20" x2="90" y2="160" stroke="rgba(148,163,184,0.18)" strokeWidth="2" />
-                    <line x1="180" y1="20" x2="180" y2="160" stroke="rgba(148,163,184,0.18)" strokeWidth="2" />
-                    <line x1="270" y1="20" x2="270" y2="160" stroke="rgba(148,163,184,0.18)" strokeWidth="2" />
-                    <rect x="64" y="48" width="52" height="16" rx="4" fill="rgba(100,116,139,0.4)" />
-                    <rect x="154" y="88" width="52" height="16" rx="4" fill="rgba(100,116,139,0.4)" />
-                    <rect x="244" y="122" width="52" height="16" rx="4" fill="rgba(100,116,139,0.4)" />
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <line x1="180" y1="30" x2="36" y2="170" stroke="rgba(148,163,184,0.22)" strokeWidth="2" />
+                    <line x1="180" y1="30" x2="324" y2="170" stroke="rgba(148,163,184,0.22)" strokeWidth="2" />
+                    <line x1="78" y1="74" x2="282" y2="74" stroke="#F59E0B" strokeWidth="5" strokeLinecap="round" />
+                    <rect x="136" y="94" width="88" height="56" rx="6" fill="rgba(0,229,255,0.16)" stroke="#00E5FF" strokeWidth="2.5" strokeDasharray="6 4" />
+                    <circle cx="180" cy="110" r="9" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
+                    <path d="M162 124 L198 124 M180 120 L180 140" stroke="#00E5FF" strokeWidth="2.5" strokeLinecap="round" />
                   </svg>
-                  <span className="absolute right-3 top-3 rounded-md border border-slate-700 bg-[#0E131E] px-2.5 py-1 text-xs font-semibold text-slate-300">
-                    Coming Soon
-                  </span>
                 </div>
 
-                <div className="p-5">
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <span>1–2 Players</span>
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
+                    <span className="font-semibold text-amber-300">Playable</span>
                     <span aria-hidden="true">·</span>
-                    <span>Head &amp; Hand Sync</span>
+                    <span>1–2P</span>
+                    <span aria-hidden="true">·</span>
+                    <span>128 BPM EDM</span>
                   </div>
-                  <h3 className="mt-2 font-display text-xl font-bold text-slate-200">
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
                     Rhythm Dodge
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                    Duck, weave, and punch incoming synthwave barriers locked to the beat using real-time landmark tracking.
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Squat, duck, and lean to dodge 3D perspective lasers synced to an EDM beat.
                   </p>
                 </div>
               </div>
 
-              <div className="px-5 pb-5">
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-800 bg-[#121724] px-4 py-2.5 text-sm font-semibold text-slate-500"
+              <div className="px-4 pb-4">
+                <Link
+                  href="/games/rhythm-dodge"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-amber-300"
                 >
-                  <Lock className="h-4 w-4" aria-hidden="true" />
-                  <span>Coming Soon</span>
-                </button>
+                  <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                  <span>Play Rhythm Dodge</span>
+                </Link>
+              </div>
+            </article>
+
+            {/* Playable Card 4: Sorcerer's Duel */}
+            <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-purple-500/40 bg-[#0E131E] transition-colors hover:border-purple-400">
+              <div>
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <path d="M90 36 L66 84 L96 84 L74 138" stroke="#00E5FF" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    <polygon points="180,44 218,68 218,112 180,136 142,112 142,68" fill="rgba(16,185,129,0.18)" stroke="#10B981" strokeWidth="2.5" />
+                    <circle cx="276" cy="90" r="28" fill="rgba(245,158,11,0.22)" stroke="#F59E0B" strokeWidth="2.5" />
+                  </svg>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
+                    <span className="font-semibold text-purple-300">Playable</span>
+                    <span aria-hidden="true">·</span>
+                    <span>1–2P</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Hand Spells</span>
+                  </div>
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
+                    Sorcerer&apos;s Duel
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Cast real-time RPS hand spells—Lightning, Reflect Shield, and Fist Charge.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pb-4">
+                <Link
+                  href="/games/sorcerers-duel"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-400"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Play Sorcerer&apos;s Duel</span>
+                </Link>
+              </div>
+            </article>
+
+            {/* Playable Card 5: Neon Muncher */}
+            <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-pink-500/40 bg-[#0E131E] transition-colors hover:border-pink-400">
+              <div>
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <circle cx="180" cy="108" r="46" stroke="#EC4899" strokeWidth="3" fill="rgba(236,72,153,0.14)" />
+                    <circle cx="162" cy="92" r="5" fill="#FFFFFF" />
+                    <circle cx="198" cy="92" r="5" fill="#FFFFFF" />
+                    <ellipse cx="180" cy="122" rx="20" ry="15" stroke="#10B981" strokeWidth="3" fill="rgba(16,185,129,0.24)" />
+                    <circle cx="180" cy="40" r="14" stroke="#F59E0B" strokeWidth="2.5" fill="rgba(245,158,11,0.25)" />
+                    <circle cx="112" cy="52" r="12" stroke="#EF4444" strokeWidth="2.5" fill="rgba(239,68,68,0.2)" />
+                    <circle cx="248" cy="52" r="12" stroke="#00E5FF" strokeWidth="2.5" fill="rgba(0,229,255,0.2)" />
+                  </svg>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
+                    <span className="font-semibold text-pink-300">Playable</span>
+                    <span aria-hidden="true">·</span>
+                    <span>1–2P</span>
+                    <span aria-hidden="true">·</span>
+                    <span>45s Face Cam</span>
+                  </div>
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
+                    Neon Muncher
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Open wide to chomp neon snacks, clamp shut on bombs, and snap Shame Cam photos.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pb-4">
+                <Link
+                  href="/games/neon-muncher"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pink-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-pink-400"
+                >
+                  <Smile className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Play Neon Muncher</span>
+                </Link>
               </div>
             </article>
           </div>

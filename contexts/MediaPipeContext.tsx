@@ -10,6 +10,8 @@ import React, {
   useState,
 } from 'react';
 import type {
+  FaceLandmarker,
+  FaceLandmarkerResult,
   HandLandmarker,
   HandLandmarkerResult,
   PoseLandmarker,
@@ -24,14 +26,17 @@ export interface MediaPipeContextValue {
   cameraStatus: CameraStatus;
   modelStatus: ModelStatus;
   poseModelStatus: ModelStatus;
+  faceModelStatus: ModelStatus;
   errorMessage: string | null;
   hasStream: boolean;
   requestCamera: () => Promise<boolean>;
   stopCamera: () => void;
   initializeModel: () => Promise<void>;
   initializePoseModel: () => Promise<void>;
+  initializeFaceModel: () => Promise<void>;
   predict: (timestampMs?: number) => HandLandmarkerResult | null;
   predictPose: (timestampMs?: number) => PoseLandmarkerResult | null;
+  predictFace: (timestampMs?: number) => FaceLandmarkerResult | null;
 }
 
 const MediaPipeContext = createContext<MediaPipeContextValue | null>(null);
@@ -44,6 +49,9 @@ const POSE_LANDMARKER_FULL_MODEL_URL =
 
 const POSE_LANDMARKER_LITE_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
+const FACE_LANDMARKER_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 
 type VisionFileset = Awaited<
   ReturnType<(typeof import('@mediapipe/tasks-vision'))['FilesetResolver']['forVisionTasks']>
@@ -98,19 +106,23 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+  const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
 
   const visionFilesetPromiseRef = useRef<Promise<VisionFileset> | null>(null);
   const modelInitPromiseRef = useRef<Promise<void> | null>(null);
   const poseInitPromiseRef = useRef<Promise<void> | null>(null);
+  const faceInitPromiseRef = useRef<Promise<void> | null>(null);
   const cameraInitPromiseRef = useRef<Promise<boolean> | null>(null);
 
   const handCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
   const poseCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
+  const faceCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
   const hasAutoInitializedRef = useRef<boolean>(false);
 
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
   const [poseModelStatus, setPoseModelStatus] = useState<ModelStatus>('idle');
+  const [faceModelStatus, setFaceModelStatus] = useState<ModelStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasStream, setHasStream] = useState<boolean>(false);
 
@@ -221,6 +233,51 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     return promise;
   }, [getVisionModuleAndFileset]);
 
+  const initializeFaceModel = useCallback(async () => {
+    if (faceLandmarkerRef.current) {
+      setFaceModelStatus('ready');
+      return;
+    }
+    if (faceInitPromiseRef.current) {
+      return faceInitPromiseRef.current;
+    }
+
+    const promise = (async () => {
+      try {
+        setFaceModelStatus('loading');
+        const { visionModule, vision } = await getVisionModuleAndFileset();
+        const { FaceLandmarker: FaceLandmarkerClass } = visionModule;
+
+        faceLandmarkerRef.current = await createWithDelegateFallback((delegate) =>
+          FaceLandmarkerClass.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: FACE_LANDMARKER_MODEL_URL,
+              delegate,
+            },
+            runningMode: 'VIDEO',
+            numFaces: 2,
+            minFaceDetectionConfidence: 0.45,
+            minFacePresenceConfidence: 0.45,
+            minTrackingConfidence: 0.45,
+          })
+        );
+        setFaceModelStatus('ready');
+      } catch (err) {
+        setFaceModelStatus('error');
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Unable to load MediaPipe FaceLandmarker model.';
+        setErrorMessage((prev) => prev ?? msg);
+      } finally {
+        faceInitPromiseRef.current = null;
+      }
+    })();
+
+    faceInitPromiseRef.current = promise;
+    return promise;
+  }, [getVisionModuleAndFileset]);
+
   const requestCamera = useCallback(async (): Promise<boolean> => {
     if (streamRef.current && streamRef.current.active) {
       setCameraStatus('active');
@@ -319,6 +376,16 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const predictFace = useCallback((timestampMs?: number): FaceLandmarkerResult | null => {
+    return detectVideoFrame(
+      faceLandmarkerRef.current,
+      videoRef.current,
+      streamRef.current,
+      faceCursorRef.current,
+      timestampMs
+    );
+  }, []);
+
   useEffect(() => {
     if (!hasAutoInitializedRef.current) {
       hasAutoInitializedRef.current = true;
@@ -339,6 +406,10 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         poseLandmarkerRef.current.close();
         poseLandmarkerRef.current = null;
       }
+      if (faceLandmarkerRef.current) {
+        faceLandmarkerRef.current.close();
+        faceLandmarkerRef.current = null;
+      }
     };
   }, [requestCamera]);
 
@@ -348,24 +419,30 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
       cameraStatus,
       modelStatus,
       poseModelStatus,
+      faceModelStatus,
       errorMessage,
       hasStream,
       requestCamera,
       stopCamera,
       initializeModel,
       initializePoseModel,
+      initializeFaceModel,
       predict,
       predictPose,
+      predictFace,
     }),
     [
       cameraStatus,
       errorMessage,
+      faceModelStatus,
       hasStream,
+      initializeFaceModel,
       initializeModel,
       initializePoseModel,
       modelStatus,
       poseModelStatus,
       predict,
+      predictFace,
       predictPose,
       requestCamera,
       stopCamera,
