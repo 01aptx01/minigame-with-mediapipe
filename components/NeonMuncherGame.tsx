@@ -458,9 +458,9 @@ export default function NeonMuncherGame() {
       accent: string
     ) => {
       const centerX = zoneX + zoneW * 0.5;
-      const barW = Math.min(220, zoneW - 44);
+      const barW = Math.min(220, Math.max(120, zoneW - 32));
       const barX = centerX - barW * 0.5;
-      const barY = 92;
+      const barY = zoneW < 320 ? 124 : 94;
 
       ctx.save();
       ctx.font = '700 11px "JetBrains Mono", monospace';
@@ -490,9 +490,9 @@ export default function NeonMuncherGame() {
 
       if (pState.calloutLife > 0) {
         ctx.globalAlpha = Math.min(1, pState.calloutLife * 1.5);
-        ctx.font = '800 24px "Outfit", sans-serif';
+        ctx.font = zoneW < 230 ? '800 18px "Outfit", sans-serif' : '800 24px "Outfit", sans-serif';
         ctx.fillStyle = pState.calloutColor;
-        ctx.fillText(pState.calloutText, centerX, zoneH * 0.25);
+        ctx.fillText(pState.calloutText, centerX, Math.max(barY + 38, zoneH * 0.25));
       }
       ctx.restore();
     };
@@ -744,14 +744,14 @@ export default function NeonMuncherGame() {
 
   const bottomControls =
     phase === 'playing' && cameraStatus !== 'active' ? (
-      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-3 py-1.5 text-xs">
-        <span className="font-mono text-[11px] text-slate-400">Move P1:</span>
+      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-2.5 py-1.5 text-xs shadow-lg">
+        <span className="hidden font-mono text-[11px] text-slate-400 sm:inline">Move P1:</span>
         <button
           type="button"
           onPointerDown={() => { controlsRef.current.p1.left = true; }}
           onPointerUp={() => { controlsRef.current.p1.left = false; }}
           onPointerLeave={() => { controlsRef.current.p1.left = false; }}
-          className="rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
         >
           ← Left (A)
         </button>
@@ -760,7 +760,7 @@ export default function NeonMuncherGame() {
           onPointerDown={() => { controlsRef.current.p1.open = true; }}
           onPointerUp={() => { controlsRef.current.p1.open = false; }}
           onPointerLeave={() => { controlsRef.current.p1.open = false; }}
-          className="rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-500/30"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-500/30"
         >
           😮 Open Wide (Space)
         </button>
@@ -769,7 +769,7 @@ export default function NeonMuncherGame() {
           onPointerDown={() => { controlsRef.current.p1.right = true; }}
           onPointerUp={() => { controlsRef.current.p1.right = false; }}
           onPointerLeave={() => { controlsRef.current.p1.right = false; }}
-          className="rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
         >
           Right (D) →
         </button>

@@ -613,17 +613,29 @@ export default function NeonSlashGame() {
 
         drawSplitDivider(ctx, width, height, 68);
 
-        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.font =
+          width < 640
+            ? '700 10px "JetBrains Mono", monospace'
+            : '700 12px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0, 229, 255, 0.52)';
-        ctx.fillText('P1 ZONE · CYAN', width * 0.25, height - 18);
+        ctx.fillText(width < 640 ? 'P1 · CYAN' : 'P1 ZONE · CYAN', width * 0.25, height - 18);
         ctx.fillStyle = 'rgba(255, 42, 109, 0.52)';
-        ctx.fillText('P2 ZONE · CRIMSON', width * 0.75, height - 18);
+        ctx.fillText(width < 640 ? 'P2 · CRIMSON' : 'P2 ZONE · CRIMSON', width * 0.75, height - 18);
       } else {
-        ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.font =
+          width < 640
+            ? '700 10px "JetBrains Mono", monospace'
+            : '700 12px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0, 229, 255, 0.52)';
-        ctx.fillText('SOLO ARENA · SLICE CYAN GEMS · DODGE BOMBS', width * 0.5, height - 18);
+        ctx.fillText(
+          width < 640
+            ? 'SOLO · SLICE CYAN GEMS'
+            : 'SOLO ARENA · SLICE CYAN GEMS · DODGE BOMBS',
+          width * 0.5,
+          height - 18
+        );
       }
 
       for (let i = 0; i < state.slicedHalves.length; i++) {

@@ -324,40 +324,59 @@ export default function PoseMatchGame() {
       const accent = playerId === 'p1' ? '#00E5FF' : '#FF2A6D';
       const pose = playerState.currentPose;
       const centerX = zoneX + zoneW * 0.5;
+      const isCompact = zoneW < 230 || zoneH < 640;
+      const hudTop = zoneW < 320 && modeNow === '1v1' ? 142 : 114;
 
       ctx.save();
       ctx.textAlign = 'center';
-      ctx.font = '800 22px "Outfit", sans-serif';
+      ctx.font = isCompact
+        ? '800 15px "Outfit", sans-serif'
+        : '800 22px "Outfit", sans-serif';
       ctx.fillStyle = pose.isFakeout ? '#EF4444' : '#F8FAFC';
       ctx.fillText(
-        pose.isFakeout ? 'AVOID! FAKE-OUT POSE' : pose.label.toUpperCase(),
+        pose.isFakeout
+          ? isCompact
+            ? 'AVOID! FAKE-OUT'
+            : 'AVOID! FAKE-OUT POSE'
+          : pose.label.toUpperCase(),
         centerX,
-        118
+        hudTop
       );
 
       if (playerState.sabotageRemaining > 0 && playerState.sabotageKind) {
-        ctx.font = '700 13px "JetBrains Mono", monospace';
+        ctx.font = isCompact
+          ? '700 11px "JetBrains Mono", monospace'
+          : '700 13px "JetBrains Mono", monospace';
         ctx.fillStyle = '#F59E0B';
         const sabText =
           playerState.sabotageKind === 'fog'
             ? `FLASHBANG FOG · ${playerState.sabotageRemaining.toFixed(1)}s`
             : `MIRROR FLIP · ${playerState.sabotageRemaining.toFixed(1)}s`;
-        ctx.fillText(sabText, centerX, 142);
+        ctx.fillText(sabText, centerX, hudTop + 22);
       }
 
       if (playerState.calloutLife > 0) {
         ctx.globalAlpha = Math.min(1, playerState.calloutLife * 1.4);
-        ctx.font = '800 26px "Outfit", sans-serif';
+        ctx.font = isCompact
+          ? '800 18px "Outfit", sans-serif'
+          : '800 26px "Outfit", sans-serif';
         ctx.fillStyle = playerState.calloutColor;
-        ctx.fillText(playerState.calloutText, centerX, zoneH * 0.27);
+        ctx.fillText(
+          playerState.calloutText,
+          centerX,
+          Math.max(hudTop + 52, zoneH * 0.27)
+        );
         ctx.globalAlpha = 1;
       }
 
-      const barW = Math.min(280, zoneW - 48);
+      const barW = Math.min(280, Math.max(120, zoneW - 32));
       const barX = centerX - barW * 0.5;
-      const barY = zoneH - 68;
+      const barY = zoneH - (isCompact ? 116 : 88);
 
-      ctx.font = '700 12px "JetBrains Mono", monospace';
+      ctx.font =
+        barW < 210
+          ? '700 10px "JetBrains Mono", monospace'
+          : '700 12px "JetBrains Mono", monospace';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#CBD5E1';
       ctx.fillText(`MATCH ${playerState.matchPercent}%`, barX, barY - 8);
@@ -366,11 +385,11 @@ export default function PoseMatchGame() {
       ctx.textAlign = 'right';
       ctx.fillStyle =
         playerState.matchPercent >= MATCH_THRESHOLD_PERCENT ? '#10B981' : '#94A3B8';
-      ctx.fillText(
-        `HOLD ${(playerState.holdProgress * holdReq).toFixed(1)}s / ${holdReq.toFixed(1)}s`,
-        barX + barW,
-        barY - 8
-      );
+      const holdLabel =
+        barW < 210
+          ? `${(playerState.holdProgress * holdReq).toFixed(1)}/${holdReq.toFixed(1)}s`
+          : `HOLD ${(playerState.holdProgress * holdReq).toFixed(1)}s / ${holdReq.toFixed(1)}s`;
+      ctx.fillText(holdLabel, barX + barW, barY - 8);
 
       ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
@@ -688,8 +707,10 @@ export default function PoseMatchGame() {
 
   const bottomControls =
     phase === 'playing' && cameraStatus !== 'active' ? (
-      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-3 py-1.5 text-xs">
-        <span className="mr-1 font-mono text-[11px] text-slate-400">Practice P1:</span>
+      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-2.5 py-1.5 text-xs shadow-lg">
+        <span className="mr-1 hidden font-mono text-[11px] text-slate-400 sm:inline">
+          Practice P1:
+        </span>
         {POSE_TEMPLATES.map((pose) => (
           <button
             key={pose.kind}
@@ -697,7 +718,7 @@ export default function PoseMatchGame() {
             onPointerDown={() => triggerPuppetPose('p1', pose.kind)}
             onPointerUp={() => triggerPuppetPose('p1', null)}
             onPointerLeave={() => triggerPuppetPose('p1', null)}
-            className={`rounded px-2 py-1 font-semibold transition-colors ${
+            className={`whitespace-nowrap rounded px-2 py-1 font-semibold transition-colors ${
               pose.isFakeout
                 ? 'border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/30'
                 : 'border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/25'

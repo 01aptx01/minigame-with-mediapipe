@@ -275,11 +275,13 @@ export default function ArcadeHub() {
 
         {/* Game Cards Grid */}
         <section id="games" className="mt-6">
-          <div className="flex items-baseline justify-between gap-4 border-b border-slate-800/80 pb-3">
-            <h2 className="font-display text-xl font-bold text-white sm:text-2xl">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-800/80 pb-3">
+            <h2 className="font-display text-xl font-bold text-white whitespace-nowrap sm:text-2xl">
               Arcade Lineup
             </h2>
-            <span className="text-xs font-mono text-slate-400">5 Playable · Ready to Party</span>
+            <span className="text-xs font-mono text-slate-400 whitespace-nowrap">
+              5 Playable · Ready to Party
+            </span>
           </div>
 
           <div className="mt-4 grid gap-3.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -316,7 +318,7 @@ export default function ArcadeHub() {
 
               <div className="px-4 pb-4">
                 <Link
-                  href="/games/neon-slash-duel"
+                  href="/?game=neon-slash-duel"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-cyan-400 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-cyan-300"
                 >
                   <Swords className="h-3.5 w-3.5" aria-hidden="true" />
@@ -357,7 +359,7 @@ export default function ArcadeHub() {
 
               <div className="px-4 pb-4">
                 <Link
-                  href="/games/pose-match-battle"
+                  href="/?game=pose-match-battle"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-rose-400"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
@@ -399,7 +401,7 @@ export default function ArcadeHub() {
 
               <div className="px-4 pb-4">
                 <Link
-                  href="/games/rhythm-dodge"
+                  href="/?game=rhythm-dodge"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-amber-300"
                 >
                   <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
@@ -438,7 +440,7 @@ export default function ArcadeHub() {
 
               <div className="px-4 pb-4">
                 <Link
-                  href="/games/sorcerers-duel"
+                  href="/?game=sorcerers-duel"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-400"
                 >
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
@@ -481,7 +483,7 @@ export default function ArcadeHub() {
 
               <div className="px-4 pb-4">
                 <Link
-                  href="/games/neon-muncher"
+                  href="/?game=neon-muncher"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pink-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-pink-400"
                 >
                   <Smile className="h-3.5 w-3.5" aria-hidden="true" />

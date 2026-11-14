@@ -420,10 +420,11 @@ export default function RhythmDodgeGame() {
         : box.stance === 'lean_right'
         ? 'DODGE RIGHT'
         : 'READY';
+      const stanceTopMin = zoneW < 320 ? 152 : 122;
       ctx.font = '700 11px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = strokeColor;
-      ctx.fillText(stanceText, bx + bw * 0.5, Math.max(88, by - 8));
+      ctx.fillText(stanceText, bx + bw * 0.5, Math.max(stanceTopMin, by - 8));
 
       ctx.restore();
     };
@@ -437,9 +438,9 @@ export default function RhythmDodgeGame() {
       accent: string
     ) => {
       const centerX = zoneX + zoneW * 0.5;
-      const barW = Math.min(240, zoneW - 48);
+      const barW = Math.min(240, Math.max(120, zoneW - 32));
       const barX = centerX - barW * 0.5;
-      const barY = 96;
+      const barY = zoneW < 320 ? 126 : 98;
 
       ctx.save();
       // HP meter bar
@@ -461,9 +462,9 @@ export default function RhythmDodgeGame() {
       // Floating hit/dodge callout
       if (pState.calloutLife > 0) {
         ctx.globalAlpha = Math.min(1, pState.calloutLife * 1.4);
-        ctx.font = '800 24px "Outfit", sans-serif';
+        ctx.font = zoneW < 230 ? '800 18px "Outfit", sans-serif' : '800 24px "Outfit", sans-serif';
         ctx.fillStyle = pState.calloutColor;
-        ctx.fillText(pState.calloutText, centerX, zoneH * 0.22);
+        ctx.fillText(pState.calloutText, centerX, Math.max(barY + 38, zoneH * 0.22));
       }
       ctx.restore();
     };
@@ -751,8 +752,8 @@ export default function RhythmDodgeGame() {
 
   const bottomControls =
     phase === 'playing' && cameraStatus !== 'active' ? (
-      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-3 py-1.5 text-xs">
-        <span className="font-mono text-[11px] text-slate-400">Move P1:</span>
+      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-2.5 py-1.5 text-xs shadow-lg">
+        <span className="hidden font-mono text-[11px] text-slate-400 sm:inline">Move P1:</span>
         <button
           type="button"
           onPointerDown={() => {
@@ -764,7 +765,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.left = false;
           }}
-          className="rounded border border-cyan-500/35 bg-cyan-500/10 px-3 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25 sm:px-3"
         >
           ← Left (A)
         </button>
@@ -779,7 +780,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.duck = false;
           }}
-          className="rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/30"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/30 sm:px-3"
         >
           ↓ Squat / Duck (S)
         </button>
@@ -794,7 +795,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.right = false;
           }}
-          className="rounded border border-cyan-500/35 bg-cyan-500/10 px-3 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25 sm:px-3"
         >
           Right (D) →
         </button>

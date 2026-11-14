@@ -97,7 +97,7 @@ export function ArcadeEndCard({
         </button>
         <Link
           href="/"
-          className="flex-1 rounded-lg border border-slate-700 bg-[#121929] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
+          className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-700 bg-[#121929] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:border-slate-500 whitespace-nowrap"
         >
           Back to Hub
         </Link>

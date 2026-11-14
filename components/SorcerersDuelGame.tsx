@@ -379,9 +379,9 @@ export default function SorcerersDuelGame() {
 
       // Zone HP Bar + Spell Label + Charge Bar
       const centerX = zoneX + zoneW * 0.5;
-      const barW = Math.min(250, zoneW - 44);
+      const barW = Math.min(250, Math.max(120, zoneW - 32));
       const barX = centerX - barW * 0.5;
-      const barY = 98;
+      const barY = zoneW < 320 ? 128 : 98;
 
       ctx.save();
       ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
@@ -399,12 +399,12 @@ export default function SorcerersDuelGame() {
       ctx.fillStyle = '#E2E8F0';
       ctx.fillText(`HP ${pState.hp} / ${pState.maxHp}`, centerX, barY - 6);
 
-      ctx.font = '800 18px "Outfit", sans-serif';
+      ctx.font = zoneW < 230 ? '800 14px "Outfit", sans-serif' : '800 18px "Outfit", sans-serif';
       ctx.fillStyle = spellColor;
-      ctx.fillText(spellMeta.label.toUpperCase(), centerX, 136);
+      ctx.fillText(spellMeta.label.toUpperCase(), centerX, barY + 34);
 
       if (pState.chargeProgress > 0.02) {
-        const cY = 148;
+        const cY = barY + 46;
         ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
         ctx.fillRect(barX, cY, barW, 7);
         ctx.fillStyle = '#F59E0B';
@@ -413,9 +413,9 @@ export default function SorcerersDuelGame() {
 
       if (pState.calloutLife > 0) {
         ctx.globalAlpha = Math.min(1, pState.calloutLife * 1.4);
-        ctx.font = '800 24px "Outfit", sans-serif';
+        ctx.font = zoneW < 230 ? '800 18px "Outfit", sans-serif' : '800 24px "Outfit", sans-serif';
         ctx.fillStyle = pState.calloutColor;
-        ctx.fillText(pState.calloutText, centerX, zoneH * 0.28);
+        ctx.fillText(pState.calloutText, centerX, Math.max(barY + 80, zoneH * 0.28));
       }
       ctx.restore();
     };
@@ -679,14 +679,14 @@ export default function SorcerersDuelGame() {
 
   const bottomControls =
     phase === 'playing' && cameraStatus !== 'active' ? (
-      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-3 py-1.5 text-xs">
-        <span className="font-mono text-[11px] text-slate-400">Cast P1:</span>
+      <div className="pointer-events-auto fixed bottom-2 left-1/2 z-20 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-700/80 bg-[#0D121E]/95 px-2.5 py-1.5 text-xs shadow-lg">
+        <span className="hidden font-mono text-[11px] text-slate-400 sm:inline">Cast P1:</span>
         <button
           type="button"
           onPointerDown={() => setFallbackSpell('p1', 'lightning')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
         >
           ✌️ Lightning (1)
         </button>
@@ -695,7 +695,7 @@ export default function SorcerersDuelGame() {
           onPointerDown={() => setFallbackSpell('p1', 'shield')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/25"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/25"
         >
           🖐️ Shield (2)
         </button>
@@ -704,7 +704,7 @@ export default function SorcerersDuelGame() {
           onPointerDown={() => setFallbackSpell('p1', 'crit')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200 hover:bg-amber-500/25"
+          className="whitespace-nowrap rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200 hover:bg-amber-500/25"
         >
           ✊ Crit Fist (3)
         </button>

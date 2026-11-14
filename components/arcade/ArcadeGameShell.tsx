@@ -242,48 +242,57 @@ export function ArcadeGameShell({
       </div>
 
       {/* Shared Top HUD Overlay (60FPS DOM-ref driven) */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-20 flex flex-col gap-2 px-4 pt-3 sm:px-6">
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: Back to Hub + P1 Readout */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-lg border border-slate-700/70 bg-[#0D121D]/90 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-400/60 hover:text-white whitespace-nowrap shrink-0"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              <span>Back to Hub</span>
-            </Link>
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex flex-col gap-1.5 px-3 pt-2.5 sm:gap-2 sm:px-6 sm:pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 sm:flex-nowrap sm:gap-4">
+          {/* Back to Hub */}
+          <Link
+            href="/"
+            aria-label="Back to Hub"
+            className="order-1 pointer-events-auto inline-flex items-center gap-1.5 rounded-lg border border-slate-700/70 bg-[#0D121D]/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-400/60 hover:text-white whitespace-nowrap shrink-0 sm:gap-2 sm:px-3 sm:py-2"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Back to Hub</span>
+            <span className="sm:hidden">Hub</span>
+          </Link>
 
-            <div className="flex items-baseline gap-2.5 rounded-lg border border-cyan-500/30 bg-[#0D121D]/90 px-3.5 py-1.5">
-              <span className="max-w-28 truncate text-[11px] font-bold tracking-wider text-cyan-400 uppercase">
+          {/* P1 Readout */}
+          <div
+            className={`order-4 flex items-baseline justify-between gap-2 rounded-lg border border-cyan-500/30 bg-[#0D121D]/90 px-3 py-1 sm:order-2 sm:justify-start sm:gap-2.5 sm:px-3.5 sm:py-1.5 ${
+              soloMode
+                ? 'basis-full sm:basis-auto'
+                : 'basis-[calc(50%-0.25rem)] min-w-0 sm:basis-auto sm:flex-none'
+            }`}
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="max-w-20 truncate text-[11px] font-bold tracking-wider text-cyan-400 uppercase sm:max-w-28">
                 {p1Label || (soloMode ? 'SOLO' : 'P1')}
               </span>
               <span
                 ref={p1ScoreTextRef}
                 data-testid="p1-score"
-                className="font-mono text-2xl font-bold text-white tabular-nums"
+                className="font-mono text-xl font-bold text-white tabular-nums sm:text-2xl"
               >
                 0
               </span>
-              <span
-                ref={p1MetaTextRef}
-                className="font-mono text-xs font-semibold text-cyan-300 tabular-nums"
-              >
-                1x
-              </span>
             </div>
+            <span
+              ref={p1MetaTextRef}
+              className="truncate font-mono text-[11px] font-semibold text-cyan-300 tabular-nums sm:text-xs"
+            >
+              1x
+            </span>
           </div>
 
           {/* Center: Match Countdown Timer + Optional Overdrive Badge */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-700/80 bg-[#0D121D]/95 px-4 py-1.5 shadow-lg">
-              <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+          <div className="order-2 flex flex-col items-center gap-1 shrink-0 sm:order-3">
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-[#0D121D]/95 px-3 py-1 shadow-lg sm:gap-2 sm:px-4 sm:py-1.5">
+              <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase sm:text-[11px]">
                 Time
               </span>
               <span
                 ref={timerTextRef}
                 data-testid="match-timer"
-                className="font-mono text-2xl font-bold text-white tabular-nums"
+                className="font-mono text-xl font-bold text-white tabular-nums sm:text-2xl"
               >
                 {initialDurationSec}
               </span>
@@ -296,80 +305,81 @@ export function ArcadeGameShell({
             </div>
           </div>
 
-          {/* Right: P2 Readout + Utility Buttons */}
-          <div className="flex items-center gap-2.5">
-            {!soloMode && (
-              <div className="flex items-baseline gap-2.5 rounded-lg border border-rose-500/30 bg-[#0D121D]/90 px-3.5 py-1.5">
-                <span
-                  ref={p2MetaTextRef}
-                  className="font-mono text-xs font-semibold text-rose-300 tabular-nums"
-                >
-                  1x
-                </span>
+          {/* P2 Readout */}
+          {!soloMode && (
+            <div className="order-5 flex basis-[calc(50%-0.25rem)] min-w-0 items-baseline justify-between gap-2 rounded-lg border border-rose-500/30 bg-[#0D121D]/90 px-3 py-1 sm:order-4 sm:basis-auto sm:flex-none sm:justify-start sm:gap-2.5 sm:px-3.5 sm:py-1.5">
+              <span
+                ref={p2MetaTextRef}
+                className="truncate font-mono text-[11px] font-semibold text-rose-300 tabular-nums sm:text-xs"
+              >
+                1x
+              </span>
+              <div className="flex items-baseline gap-2">
                 <span
                   ref={p2ScoreTextRef}
                   data-testid="p2-score"
-                  className="font-mono text-2xl font-bold text-white tabular-nums"
+                  className="font-mono text-xl font-bold text-white tabular-nums sm:text-2xl"
                 >
                   0
                 </span>
-                <span className="max-w-28 truncate text-[11px] font-bold tracking-wider text-rose-400 uppercase">
+                <span className="max-w-20 truncate text-[11px] font-bold tracking-wider text-rose-400 uppercase sm:max-w-28">
                   {p2Label || 'P2'}
                 </span>
               </div>
-            )}
-
-            <div className="pointer-events-auto flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  onToggleMute();
-                }}
-                aria-label={isMuted ? 'Unmute audio (M)' : 'Mute audio (M)'}
-                title="Mute / Unmute (M)"
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
-              >
-                {isMuted ? (
-                  <VolumeX className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Volume2 className="h-4 w-4" aria-hidden="true" />
-                )}
-              </button>
-
-              {phase !== 'title' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.currentTarget.blur();
-                      onTogglePause();
-                    }}
-                    aria-label={phase === 'paused' ? 'Resume game (P)' : 'Pause game (P)'}
-                    title="Pause / Resume (P)"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
-                  >
-                    {phase === 'paused' ? (
-                      <Play className="h-4 w-4" aria-hidden="true" />
-                    ) : (
-                      <Pause className="h-4 w-4" aria-hidden="true" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.currentTarget.blur();
-                      onRestart();
-                    }}
-                    aria-label="Restart round (R)"
-                    title="Restart (R)"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </>
-              )}
             </div>
+          )}
+
+          {/* Utility Buttons */}
+          <div className="order-3 pointer-events-auto flex items-center gap-1.5 shrink-0 sm:order-5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                onToggleMute();
+              }}
+              aria-label={isMuted ? 'Unmute audio (M)' : 'Mute audio (M)'}
+              title="Mute / Unmute (M)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:h-9 sm:w-9"
+            >
+              {isMuted ? (
+                <VolumeX className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <Volume2 className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+
+            {phase !== 'title' && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    onTogglePause();
+                  }}
+                  aria-label={phase === 'paused' ? 'Resume game (P)' : 'Pause game (P)'}
+                  title="Pause / Resume (P)"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:h-9 sm:w-9"
+                >
+                  {phase === 'paused' ? (
+                    <Play className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Pause className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.currentTarget.blur();
+                    onRestart();
+                  }}
+                  aria-label="Restart round (R)"
+                  title="Restart (R)"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:h-9 sm:w-9"
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -400,15 +410,15 @@ export function ArcadeGameShell({
 
       {/* Title Screen Overlay */}
       {phase === 'title' && titleOverlay && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#07090F]/82 px-4">
-          {titleOverlay}
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+          <div className="my-auto flex w-full justify-center">{titleOverlay}</div>
         </div>
       )}
 
       {/* Shared Pause Modal */}
       {phase === 'paused' && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#07090F]/82 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-[#0D121E] p-6 text-center shadow-2xl">
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+          <div className="my-auto w-full max-w-sm rounded-2xl border border-slate-700 bg-[#0D121E] p-6 text-center shadow-2xl">
             <h2 className="font-display text-2xl font-bold text-white">Match Paused</h2>
             <p className="mt-1.5 text-sm text-slate-400">{pauseSubtitle}</p>
             <div className="mt-6 flex flex-col gap-2.5">
@@ -428,7 +438,7 @@ export function ArcadeGameShell({
               </button>
               <Link
                 href="/"
-                className="w-full rounded-lg border border-slate-800 px-5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:text-white"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-800 px-5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:text-white"
               >
                 Back to Hub
               </Link>
@@ -439,8 +449,8 @@ export function ArcadeGameShell({
 
       {/* End Game Overlay */}
       {phase === 'gameover' && endOverlay && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#07090F]/86 px-4 py-6 overflow-y-auto">
-          {endOverlay}
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+          <div className="my-auto flex w-full justify-center">{endOverlay}</div>
         </div>
       )}
     </div>
