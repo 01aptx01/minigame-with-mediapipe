@@ -434,7 +434,7 @@ export function stepGameSimulation(
     }
   }
 
-  // Update active targets
+  // Update active targets (O(1) swap-and-pop removal)
   for (let i = state.targets.length - 1; i >= 0; i--) {
     const t = state.targets[i];
     t.x += t.vx * dt;
@@ -453,11 +453,13 @@ export function stepGameSimulation(
     }
 
     if (t.sliced || t.y > height + 90) {
-      state.targets.splice(i, 1);
+      const lastIdx = state.targets.length - 1;
+      if (i !== lastIdx) state.targets[i] = state.targets[lastIdx];
+      state.targets.pop();
     }
   }
 
-  // Update sliced halves
+  // Update sliced halves (O(1) swap-and-pop removal)
   for (let i = state.slicedHalves.length - 1; i >= 0; i--) {
     const h = state.slicedHalves[i];
     h.x += h.vx * dt;
@@ -467,17 +469,21 @@ export function stepGameSimulation(
     h.life += dt;
     h.alpha = Math.max(0, 1 - h.life / h.maxLife);
     if (h.life >= h.maxLife || h.y > height + 100) {
-      state.slicedHalves.splice(i, 1);
+      const lastIdx = state.slicedHalves.length - 1;
+      if (i !== lastIdx) state.slicedHalves[i] = state.slicedHalves[lastIdx];
+      state.slicedHalves.pop();
     }
   }
 
-  // Update floating callouts
+  // Update floating callouts (O(1) swap-and-pop removal)
   for (let i = state.callouts.length - 1; i >= 0; i--) {
     const c = state.callouts[i];
     c.y += c.vy * dt;
     c.life += dt;
     if (c.life >= c.maxLife) {
-      state.callouts.splice(i, 1);
+      const lastIdx = state.callouts.length - 1;
+      if (i !== lastIdx) state.callouts[i] = state.callouts[lastIdx];
+      state.callouts.pop();
     }
   }
 

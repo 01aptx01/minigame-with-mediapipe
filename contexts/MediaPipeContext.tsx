@@ -39,8 +39,58 @@ const MediaPipeContext = createContext<MediaPipeContextValue | null>(null);
 const HAND_LANDMARKER_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 
-const POSE_LANDMARKER_MODEL_URL =
+const POSE_LANDMARKER_FULL_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
+
+const POSE_LANDMARKER_LITE_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
+type VisionFileset = Awaited<
+  ReturnType<(typeof import('@mediapipe/tasks-vision'))['FilesetResolver']['forVisionTasks']>
+>;
+
+interface VideoTrackCursor {
+  lastVideoTime: number;
+  lastTimestamp: number;
+}
+
+async function createWithDelegateFallback<T>(
+  createFn: (delegate: 'GPU' | 'CPU') => Promise<T>
+): Promise<T> {
+  try {
+    return await createFn('GPU');
+  } catch {
+    return await createFn('CPU');
+  }
+}
+
+function detectVideoFrame<T>(
+  landmarker: { detectForVideo: (video: HTMLVideoElement, timestampMs: number) => T } | null,
+  video: HTMLVideoElement | null,
+  stream: MediaStream | null,
+  cursor: VideoTrackCursor,
+  timestampMs?: number
+): T | null {
+  if (!landmarker || !video || !stream) return null;
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+    return null;
+  }
+
+  if (video.currentTime === cursor.lastVideoTime) {
+    return null;
+  }
+  cursor.lastVideoTime = video.currentTime;
+
+  const now = timestampMs ?? performance.now();
+  const safeTimestamp = now > cursor.lastTimestamp ? now : cursor.lastTimestamp + 1;
+  cursor.lastTimestamp = safeTimestamp;
+
+  try {
+    return landmarker.detectForVideo(video, safeTimestamp);
+  } catch {
+    return null;
+  }
+}
 
 export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -49,15 +99,13 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
+  const visionFilesetPromiseRef = useRef<Promise<VisionFileset> | null>(null);
   const modelInitPromiseRef = useRef<Promise<void> | null>(null);
   const poseInitPromiseRef = useRef<Promise<void> | null>(null);
   const cameraInitPromiseRef = useRef<Promise<boolean> | null>(null);
 
-  const lastHandVideoTimeRef = useRef<number>(-1);
-  const lastHandTimestampRef = useRef<number>(0);
-  const lastPoseVideoTimeRef = useRef<number>(-1);
-  const lastPoseTimestampRef = useRef<number>(0);
-
+  const handCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
+  const poseCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
   const hasAutoInitializedRef = useRef<boolean>(false);
 
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
@@ -65,6 +113,16 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   const [poseModelStatus, setPoseModelStatus] = useState<ModelStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasStream, setHasStream] = useState<boolean>(false);
+
+  const getVisionModuleAndFileset = useCallback(async () => {
+    const visionModule = await import('@mediapipe/tasks-vision');
+    if (!visionFilesetPromiseRef.current) {
+      visionFilesetPromiseRef.current =
+        visionModule.FilesetResolver.forVisionTasks('/mediapipe/wasm');
+    }
+    const vision = await visionFilesetPromiseRef.current;
+    return { visionModule, vision };
+  }, []);
 
   const initializeModel = useCallback(async () => {
     if (handLandmarkerRef.current) {
@@ -78,39 +136,22 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     const promise = (async () => {
       try {
         setModelStatus('loading');
-        const visionModule = await import('@mediapipe/tasks-vision');
-        const { FilesetResolver, HandLandmarker: HandLandmarkerClass } = visionModule;
+        const { visionModule, vision } = await getVisionModuleAndFileset();
+        const { HandLandmarker: HandLandmarkerClass } = visionModule;
 
-        const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
-
-        let landmarker: HandLandmarker;
-        try {
-          landmarker = await HandLandmarkerClass.createFromOptions(vision, {
+        handLandmarkerRef.current = await createWithDelegateFallback((delegate) =>
+          HandLandmarkerClass.createFromOptions(vision, {
             baseOptions: {
               modelAssetPath: HAND_LANDMARKER_MODEL_URL,
-              delegate: 'GPU',
+              delegate,
             },
             runningMode: 'VIDEO',
             numHands: 4,
             minHandDetectionConfidence: 0.45,
             minHandPresenceConfidence: 0.45,
             minTrackingConfidence: 0.45,
-          });
-        } catch {
-          landmarker = await HandLandmarkerClass.createFromOptions(vision, {
-            baseOptions: {
-              modelAssetPath: HAND_LANDMARKER_MODEL_URL,
-              delegate: 'CPU',
-            },
-            runningMode: 'VIDEO',
-            numHands: 4,
-            minHandDetectionConfidence: 0.45,
-            minHandPresenceConfidence: 0.45,
-            minTrackingConfidence: 0.45,
-          });
-        }
-
-        handLandmarkerRef.current = landmarker;
+          })
+        );
         setModelStatus('ready');
       } catch (err) {
         setModelStatus('error');
@@ -126,7 +167,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
     modelInitPromiseRef.current = promise;
     return promise;
-  }, []);
+  }, [getVisionModuleAndFileset]);
 
   const initializePoseModel = useCallback(async () => {
     if (poseLandmarkerRef.current) {
@@ -140,39 +181,29 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     const promise = (async () => {
       try {
         setPoseModelStatus('loading');
-        const visionModule = await import('@mediapipe/tasks-vision');
-        const { FilesetResolver, PoseLandmarker: PoseLandmarkerClass } = visionModule;
+        const { visionModule, vision } = await getVisionModuleAndFileset();
+        const { PoseLandmarker: PoseLandmarkerClass } = visionModule;
 
-        const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+        const createPose = (modelUrl: string) =>
+          createWithDelegateFallback((delegate) =>
+            PoseLandmarkerClass.createFromOptions(vision, {
+              baseOptions: {
+                modelAssetPath: modelUrl,
+                delegate,
+              },
+              runningMode: 'VIDEO',
+              numPoses: 2,
+              minPoseDetectionConfidence: 0.5,
+              minPosePresenceConfidence: 0.5,
+              minTrackingConfidence: 0.5,
+            })
+          );
 
-        let poseLandmarker: PoseLandmarker;
         try {
-          poseLandmarker = await PoseLandmarkerClass.createFromOptions(vision, {
-            baseOptions: {
-              modelAssetPath: POSE_LANDMARKER_MODEL_URL,
-              delegate: 'GPU',
-            },
-            runningMode: 'VIDEO',
-            numPoses: 2,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
+          poseLandmarkerRef.current = await createPose(POSE_LANDMARKER_FULL_MODEL_URL);
         } catch {
-          poseLandmarker = await PoseLandmarkerClass.createFromOptions(vision, {
-            baseOptions: {
-              modelAssetPath: POSE_LANDMARKER_MODEL_URL,
-              delegate: 'CPU',
-            },
-            runningMode: 'VIDEO',
-            numPoses: 2,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5,
-          });
+          poseLandmarkerRef.current = await createPose(POSE_LANDMARKER_LITE_MODEL_URL);
         }
-
-        poseLandmarkerRef.current = poseLandmarker;
         setPoseModelStatus('ready');
       } catch (err) {
         setPoseModelStatus('error');
@@ -188,7 +219,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
     poseInitPromiseRef.current = promise;
     return promise;
-  }, []);
+  }, [getVisionModuleAndFileset]);
 
   const requestCamera = useCallback(async (): Promise<boolean> => {
     if (streamRef.current && streamRef.current.active) {
@@ -207,7 +238,9 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         typeof navigator.mediaDevices.getUserMedia !== 'function'
       ) {
         setCameraStatus('unavailable');
-        setErrorMessage('Camera API unavailable in this browser. Interactive fallback mode is active.');
+        setErrorMessage(
+          'Camera API unavailable in this browser. Interactive fallback mode is active.'
+        );
         setHasStream(false);
         return false;
       }
@@ -231,14 +264,14 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         setCameraStatus('active');
         setErrorMessage(null);
         setHasStream(true);
-
-        void initializeModel();
         return true;
       } catch (err) {
         const name = err instanceof DOMException ? err.name : '';
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
           setCameraStatus('denied');
-          setErrorMessage('Camera permission was denied. Enable camera access or use interactive fallback controls.');
+          setErrorMessage(
+            'Camera permission was denied. Enable camera access or use interactive fallback controls.'
+          );
         } else {
           setCameraStatus('unavailable');
           setErrorMessage('No webcam detected. Interactive fallback mode is ready.');
@@ -252,7 +285,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
     cameraInitPromiseRef.current = promise;
     return promise;
-  }, [initializeModel]);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -267,62 +300,33 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const predict = useCallback((timestampMs?: number): HandLandmarkerResult | null => {
-    const landmarker = handLandmarkerRef.current;
-    const video = videoRef.current;
-    if (!landmarker || !video || !streamRef.current) return null;
-    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-      return null;
-    }
-
-    if (video.currentTime === lastHandVideoTimeRef.current) {
-      return null;
-    }
-    lastHandVideoTimeRef.current = video.currentTime;
-
-    const now = timestampMs ?? performance.now();
-    const safeTimestamp =
-      now > lastHandTimestampRef.current ? now : lastHandTimestampRef.current + 1;
-    lastHandTimestampRef.current = safeTimestamp;
-
-    try {
-      return landmarker.detectForVideo(video, safeTimestamp);
-    } catch {
-      return null;
-    }
+    return detectVideoFrame(
+      handLandmarkerRef.current,
+      videoRef.current,
+      streamRef.current,
+      handCursorRef.current,
+      timestampMs
+    );
   }, []);
 
   const predictPose = useCallback((timestampMs?: number): PoseLandmarkerResult | null => {
-    const landmarker = poseLandmarkerRef.current;
-    const video = videoRef.current;
-    if (!landmarker || !video || !streamRef.current) return null;
-    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
-      return null;
-    }
-
-    if (video.currentTime === lastPoseVideoTimeRef.current) {
-      return null;
-    }
-    lastPoseVideoTimeRef.current = video.currentTime;
-
-    const now = timestampMs ?? performance.now();
-    const safeTimestamp =
-      now > lastPoseTimestampRef.current ? now : lastPoseTimestampRef.current + 1;
-    lastPoseTimestampRef.current = safeTimestamp;
-
-    try {
-      return landmarker.detectForVideo(video, safeTimestamp);
-    } catch {
-      return null;
-    }
+    return detectVideoFrame(
+      poseLandmarkerRef.current,
+      videoRef.current,
+      streamRef.current,
+      poseCursorRef.current,
+      timestampMs
+    );
   }, []);
 
   useEffect(() => {
-    if (hasAutoInitializedRef.current) return;
-    hasAutoInitializedRef.current = true;
-    void requestCamera();
-    void initializeModel();
+    if (!hasAutoInitializedRef.current) {
+      hasAutoInitializedRef.current = true;
+      void requestCamera();
+    }
 
     return () => {
+      hasAutoInitializedRef.current = false;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -336,7 +340,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         poseLandmarkerRef.current = null;
       }
     };
-  }, [initializeModel, requestCamera]);
+  }, [requestCamera]);
 
   const value = useMemo<MediaPipeContextValue>(
     () => ({

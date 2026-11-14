@@ -74,38 +74,75 @@ export function ArcadeGameShell({
   const tugDividerRef = useRef<HTMLDivElement | null>(null);
   const centerBadgeRef = useRef<HTMLSpanElement | null>(null);
 
+  const lastHudRef = useRef<{
+    timer: string;
+    p1Score: string;
+    p1Meta: string;
+    p2Score: string;
+    p2Meta: string;
+    overdrive: boolean;
+    tugPct: string;
+    divPct: string;
+  }>({
+    timer: '',
+    p1Score: '',
+    p1Meta: '',
+    p2Score: '',
+    p2Meta: '',
+    overdrive: false,
+    tugPct: '',
+    divPct: '',
+  });
+
   const updateHud = useCallback((data: ArcadeHudUpdate) => {
-    if (timerTextRef.current) {
-      const secs = Math.max(0, Math.ceil(data.timeRemaining));
-      timerTextRef.current.textContent = String(secs).padStart(2, '0');
+    const prev = lastHudRef.current;
+
+    const timerText = String(Math.max(0, Math.ceil(data.timeRemaining))).padStart(2, '0');
+    if (timerTextRef.current && prev.timer !== timerText) {
+      prev.timer = timerText;
+      timerTextRef.current.textContent = timerText;
     }
-    if (p1ScoreTextRef.current) {
-      p1ScoreTextRef.current.textContent = String(Math.round(data.p1Score));
+
+    const p1ScoreText = String(Math.round(data.p1Score));
+    if (p1ScoreTextRef.current && prev.p1Score !== p1ScoreText) {
+      prev.p1Score = p1ScoreText;
+      p1ScoreTextRef.current.textContent = p1ScoreText;
     }
-    if (p1MetaTextRef.current) {
+
+    if (p1MetaTextRef.current && prev.p1Meta !== data.p1Meta) {
+      prev.p1Meta = data.p1Meta;
       p1MetaTextRef.current.textContent = data.p1Meta;
     }
+
     if (p2ScoreTextRef.current && data.p2Score !== undefined) {
-      p2ScoreTextRef.current.textContent = String(Math.round(data.p2Score));
-    }
-    if (p2MetaTextRef.current && data.p2Meta !== undefined) {
-      p2MetaTextRef.current.textContent = data.p2Meta;
-    }
-    if (centerBadgeRef.current) {
-      if (data.overdrive) {
-        centerBadgeRef.current.classList.remove('hidden');
-      } else {
-        centerBadgeRef.current.classList.add('hidden');
+      const p2ScoreText = String(Math.round(data.p2Score));
+      if (prev.p2Score !== p2ScoreText) {
+        prev.p2Score = p2ScoreText;
+        p2ScoreTextRef.current.textContent = p2ScoreText;
       }
     }
 
+    if (p2MetaTextRef.current && data.p2Meta !== undefined && prev.p2Meta !== data.p2Meta) {
+      prev.p2Meta = data.p2Meta;
+      p2MetaTextRef.current.textContent = data.p2Meta;
+    }
+
+    const overdriveNow = Boolean(data.overdrive);
+    if (centerBadgeRef.current && prev.overdrive !== overdriveNow) {
+      prev.overdrive = overdriveNow;
+      centerBadgeRef.current.classList.toggle('hidden', !overdriveNow);
+    }
+
     const pct = (Math.max(0, Math.min(1, data.tugRatio)) * 100).toFixed(2);
-    if (tugP1BarRef.current) {
+    if (tugP1BarRef.current && prev.tugPct !== pct) {
+      prev.tugPct = pct;
       tugP1BarRef.current.style.width = `${pct}%`;
     }
-    if (tugDividerRef.current) {
-      const divPct =
-        data.tugDividerPercent !== undefined ? data.tugDividerPercent.toFixed(2) : pct;
+
+    const divPct =
+      data.tugDividerPercent !== undefined ? data.tugDividerPercent.toFixed(2) : pct;
+    if (tugDividerRef.current && prev.divPct !== divPct) {
+      prev.divPct = divPct;
       tugDividerRef.current.style.left = `${divPct}%`;
     }
   }, []);

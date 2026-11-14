@@ -1,3 +1,12 @@
+interface ToneOptions {
+  type: OscillatorType;
+  startFreq: number;
+  endFreq?: number;
+  gainPeak: number;
+  durationSec: number;
+  delaySec?: number;
+}
+
 export class ArcadeAudioEngine {
   private ctx: AudioContext | null = null;
   private muted: boolean = false;
@@ -17,6 +26,36 @@ export class ArcadeAudioEngine {
     return this.ctx;
   }
 
+  private playTone({
+    type,
+    startFreq,
+    endFreq,
+    gainPeak,
+    durationSec,
+    delaySec = 0,
+  }: ToneOptions) {
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+
+    const start = ctx.currentTime + delaySec;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(startFreq, start);
+    if (endFreq !== undefined) {
+      osc.frequency.exponentialRampToValueAtTime(endFreq, start + durationSec);
+    }
+
+    gain.gain.setValueAtTime(gainPeak, start);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + durationSec);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + durationSec + 0.015);
+  }
+
   public setMuted(muted: boolean) {
     this.muted = muted;
   }
@@ -26,141 +65,77 @@ export class ArcadeAudioEngine {
   }
 
   public playSlice(multiplier: number) {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
     const baseFreq = 420 + Math.min(multiplier, 5) * 95;
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.65, now + 0.09);
-
-    gain.gain.setValueAtTime(0.14, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.15);
+    this.playTone({
+      type: 'triangle',
+      startFreq: baseFreq,
+      endFreq: baseFreq * 1.65,
+      gainPeak: 0.14,
+      durationSec: 0.13,
+    });
   }
 
   public playPoseMatch(combo: number, overdrive: boolean) {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
     const root = overdrive ? 587.33 : 440 + Math.min(combo, 5) * 55;
-    const notes = [root, root * 1.25, root * 1.5];
-
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const start = now + idx * 0.045;
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(0.14, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.19);
+    [root, root * 1.25, root * 1.5].forEach((freq, idx) => {
+      this.playTone({
+        type: 'triangle',
+        startFreq: freq,
+        gainPeak: 0.14,
+        durationSec: 0.18,
+        delaySec: idx * 0.045,
+      });
     });
   }
 
   public playOverdriveStart() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(220, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.32);
-    gain.gain.setValueAtTime(0.14, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.38);
+    this.playTone({
+      type: 'sawtooth',
+      startFreq: 220,
+      endFreq: 880,
+      gainPeak: 0.14,
+      durationSec: 0.35,
+    });
   }
 
   public playSabotage() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(640, now);
-    osc.frequency.exponentialRampToValueAtTime(160, now + 0.28);
-
-    gain.gain.setValueAtTime(0.16, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.31);
+    this.playTone({
+      type: 'sawtooth',
+      startFreq: 640,
+      endFreq: 160,
+      gainPeak: 0.16,
+      durationSec: 0.29,
+    });
   }
 
   public playPenalty(isHeavy: boolean) {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(isHeavy ? 130 : 210, now);
-    osc.frequency.exponentialRampToValueAtTime(isHeavy ? 45 : 95, now + (isHeavy ? 0.28 : 0.18));
-
-    gain.gain.setValueAtTime(isHeavy ? 0.22 : 0.14, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + (isHeavy ? 0.3 : 0.2));
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + (isHeavy ? 0.31 : 0.21));
+    this.playTone({
+      type: 'sawtooth',
+      startFreq: isHeavy ? 130 : 210,
+      endFreq: isHeavy ? 45 : 95,
+      gainPeak: isHeavy ? 0.22 : 0.14,
+      durationSec: isHeavy ? 0.29 : 0.19,
+    });
   }
 
   public playCountdownTick() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, now);
-    gain.gain.setValueAtTime(0.08, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.09);
+    this.playTone({
+      type: 'sine',
+      startFreq: 880,
+      gainPeak: 0.08,
+      durationSec: 0.08,
+    });
   }
 
   public playRoundEnd() {
-    const ctx = this.ensureContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-
-    notes.forEach((freq, idx) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const start = now + idx * 0.08;
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, start);
-      gain.gain.setValueAtTime(0.12, start);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(start);
-      osc.stop(start + 0.3);
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+      this.playTone({
+        type: 'triangle',
+        startFreq: freq,
+        gainPeak: 0.12,
+        durationSec: 0.28,
+        delaySec: idx * 0.08,
+      });
     });
   }
 }

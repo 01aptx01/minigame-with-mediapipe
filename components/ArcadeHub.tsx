@@ -15,6 +15,7 @@ import {
   INDEX_FINGERTIP_LANDMARK,
   projectLandmarkToCanvas,
 } from '@/lib/games/neon-slash/engine';
+import { drawArenaBackdrop, drawSplitDivider } from '@/lib/games/shared/canvas';
 
 export default function ArcadeHub() {
   const {
@@ -23,86 +24,67 @@ export default function ArcadeHub() {
     modelStatus,
     errorMessage,
     requestCamera,
+    initializeModel,
     predict,
   } = useMediaPipe();
 
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewSizeRef = useRef<{ width: number; height: number }>({ width: 560, height: 240 });
   const pointerPosRef = useRef<{ x: number; y: number; active: boolean }>({
     x: 0,
     y: 0,
     active: false,
   });
 
+  useEffect(() => {
+    void initializeModel();
+  }, [initializeModel]);
+
   // Live 60FPS calibration preview canvas in Hero right column
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
+
+    const updateSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(300, Math.floor(rect.width));
+      const height = Math.max(200, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      previewSizeRef.current = { width, height };
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(canvas);
 
     let rafId = 0;
 
     const renderPreview = (now: number) => {
       rafId = requestAnimationFrame(renderPreview);
-      const rect = canvas.getBoundingClientRect();
-      const width = Math.max(300, Math.floor(rect.width));
-      const height = Math.max(200, Math.floor(rect.height));
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      if (document.hidden) return;
 
-      if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
-        canvas.width = Math.floor(width * dpr);
-        canvas.height = Math.floor(height * dpr);
-      }
+      const { width, height } = previewSizeRef.current;
+      const dpr = canvas.width / Math.max(1, width);
 
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      ctx.fillStyle = '#090D16';
-      ctx.fillRect(0, 0, width, height);
+      const hasVideo = drawArenaBackdrop(ctx, videoRef.current, width, height, {
+        background: '#090D16',
+        videoAlpha: 0.52,
+        gridStep: 48,
+        gridStroke: 'rgba(148, 163, 184, 0.08)',
+      });
 
-      const video = videoRef.current;
-      if (video && video.readyState >= 2 && video.videoWidth > 0) {
-        ctx.save();
-        ctx.globalAlpha = 0.52;
-        ctx.translate(width, 0);
-        ctx.scale(-1, 1);
-        const videoAspect = video.videoWidth / video.videoHeight;
-        const canvasAspect = width / height;
-        let drawW = width;
-        let drawH = height;
-        let drawX = 0;
-        let drawY = 0;
-        if (canvasAspect > videoAspect) {
-          drawH = width / videoAspect;
-          drawY = (height - drawH) * 0.5;
-        } else {
-          drawW = height * videoAspect;
-          drawX = (width - drawW) * 0.5;
-        }
-        ctx.drawImage(video, drawX, drawY, drawW, drawH);
-        ctx.restore();
-      } else {
-        // Subtle neon calibration grid when webcam isn't active
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
-        ctx.lineWidth = 1;
-        for (let gx = 0; gx <= width; gx += 48) {
-          ctx.beginPath();
-          ctx.moveTo(gx, 0);
-          ctx.lineTo(gx, height);
-          ctx.stroke();
-        }
-        for (let gy = 0; gy <= height; gy += 48) {
-          ctx.beginPath();
-          ctx.moveTo(0, gy);
-          ctx.lineTo(width, gy);
-          ctx.stroke();
-        }
-
+      if (!hasVideo) {
         // Ambient floating calibration targets
         const t = now * 0.0014;
         const p1x = width * 0.25 + Math.cos(t) * 28;
         const p1y = height * 0.5 + Math.sin(t * 1.4) * 22;
-        ctx.save();
         ctx.strokeStyle = '#00E5FF';
         ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
         ctx.lineWidth = 2;
@@ -114,14 +96,11 @@ export default function ArcadeHub() {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.restore();
 
         const p2x = width * 0.75 + Math.sin(t * 1.1) * 28;
         const p2y = height * 0.5 + Math.cos(t * 1.3) * 22;
-        ctx.save();
         ctx.strokeStyle = '#FF2A6D';
         ctx.fillStyle = 'rgba(255, 42, 109, 0.16)';
-        ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(p2x, p2y - 18);
         ctx.lineTo(p2x + 15, p2y);
@@ -130,19 +109,9 @@ export default function ArcadeHub() {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.restore();
       }
 
-      // Split arena vertical divider
-      ctx.save();
-      ctx.strokeStyle = 'rgba(226, 232, 240, 0.24)';
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath();
-      ctx.moveTo(width * 0.5, 0);
-      ctx.lineTo(width * 0.5, height);
-      ctx.stroke();
-      ctx.restore();
+      drawSplitDivider(ctx, width, height, 0);
 
       // Zone labels
       ctx.font = '700 11px "JetBrains Mono", monospace';
@@ -157,45 +126,48 @@ export default function ArcadeHub() {
       // Draw live MediaPipe fingertips if active
       const result = predict(now);
       if (result && result.landmarks.length > 0) {
-        result.landmarks.forEach((hand) => {
-          const tip = hand[INDEX_FINGERTIP_LANDMARK];
-          if (!tip) return;
+        for (let i = 0; i < result.landmarks.length; i++) {
+          const tip = result.landmarks[i][INDEX_FINGERTIP_LANDMARK];
+          if (!tip) continue;
           const { x, y } = projectLandmarkToCanvas(tip, width, height, true);
           const side = getPlayerSideForX(x, width);
           const color = side === 'p1' ? '#00E5FF' : '#FF2A6D';
 
-          ctx.save();
+          ctx.strokeStyle = side === 'p1' ? 'rgba(0, 229, 255, 0.28)' : 'rgba(255, 42, 109, 0.28)';
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          ctx.arc(x, y, 13, 0, Math.PI * 2);
+          ctx.stroke();
+
           ctx.strokeStyle = color;
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 14;
           ctx.lineWidth = 2.5;
           ctx.beginPath();
           ctx.arc(x, y, 11, 0, Math.PI * 2);
           ctx.stroke();
+
           ctx.fillStyle = '#FFFFFF';
           ctx.beginPath();
           ctx.arc(x, y, 4, 0, Math.PI * 2);
           ctx.fill();
-          ctx.restore();
-        });
+        }
       } else if (pointerPosRef.current.active) {
         const { x, y } = pointerPosRef.current;
         const side = getPlayerSideForX(x, width);
-        const color = side === 'p1' ? '#00E5FF' : '#FF2A6D';
-        ctx.save();
-        ctx.strokeStyle = color;
+        ctx.strokeStyle = side === 'p1' ? '#00E5FF' : '#FF2A6D';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 10, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.restore();
       }
 
       ctx.restore();
     };
 
     rafId = requestAnimationFrame(renderPreview);
-    return () => cancelAnimationFrame(rafId);
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, [predict, videoRef]);
 
   const handlePreviewMove = (e: React.PointerEvent<HTMLCanvasElement>) => {

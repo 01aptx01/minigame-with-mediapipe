@@ -195,6 +195,14 @@ export const POSE_TEMPLATES: PoseTemplate[] = [
 
 export const VALID_POSES = POSE_TEMPLATES.filter((p) => !p.isFakeout);
 export const FAKEOUT_POSE = POSE_TEMPLATES.find((p) => p.isFakeout)!;
+export const POSE_TEMPLATE_BY_KIND: Record<PoseKind, PoseTemplate> = POSE_TEMPLATES.reduce(
+  (acc, tmpl) => {
+    acc[tmpl.kind] = tmpl;
+    return acc;
+  },
+  {} as Record<PoseKind, PoseTemplate>
+);
+export const POSE_RENDER_KEYPOINTS = [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28] as const;
 
 export function scorePoseMatchPercent(
   observedAngles: Record<JointKey, number>,
