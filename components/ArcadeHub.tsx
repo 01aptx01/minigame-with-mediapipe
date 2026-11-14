@@ -364,7 +364,7 @@ export default function ArcadeHub() {
                 Select a game mode to enter the arena.
               </p>
             </div>
-            <span className="text-xs font-mono text-slate-400">1 Playable · 2 In Development</span>
+            <span className="text-xs font-mono text-slate-400">2 Playable · 1 In Development</span>
           </div>
 
           <div className="mt-6 grid gap-6 md:grid-cols-3">
@@ -448,83 +448,69 @@ export default function ArcadeHub() {
               </div>
             </article>
 
-            {/* Disabled Card 2: Pose Match Battle */}
+            {/* Playable Card 2: Pose Match Battle */}
             <article
-              className="flex flex-col justify-between overflow-hidden rounded-xl border border-slate-800 bg-[#0B0F19] opacity-80"
+              className="flex flex-col justify-between overflow-hidden rounded-xl border border-rose-500/40 bg-[#0E131E] transition-colors hover:border-rose-400"
             >
               <div>
-                <div className="relative h-36 w-full overflow-hidden border-b border-slate-800 bg-[#080B12]">
+                <div className="relative h-36 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
                   <svg
                     viewBox="0 0 360 180"
                     className="h-full w-full"
                     aria-hidden="true"
                   >
-                    <rect
-                      x="54"
-                      y="32"
-                      width="92"
-                      height="116"
-                      rx="10"
-                      fill="none"
+                    <line
+                      x1="180"
+                      y1="0"
+                      x2="180"
+                      y2="180"
                       stroke="rgba(148,163,184,0.22)"
-                      strokeWidth="2"
+                      strokeDasharray="6 6"
                     />
-                    <circle cx="100" cy="64" r="12" stroke="#64748B" strokeWidth="2.5" fill="none" />
+                    <circle cx="100" cy="54" r="12" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
                     <path
-                      d="M72 96 L100 84 L128 96 M100 84 L100 118 M100 118 L82 140 M100 118 L118 140"
-                      stroke="#64748B"
-                      strokeWidth="2.5"
+                      d="M68 72 L100 84 L132 72 M100 84 L100 118 M100 118 L80 144 M100 118 L120 144"
+                      stroke="#00E5FF"
+                      strokeWidth="3"
                       strokeLinecap="round"
                       fill="none"
                     />
-                    <rect
-                      x="214"
-                      y="32"
-                      width="92"
-                      height="116"
-                      rx="10"
-                      fill="none"
-                      stroke="rgba(148,163,184,0.22)"
-                      strokeWidth="2"
-                    />
-                    <circle cx="260" cy="64" r="12" stroke="#64748B" strokeWidth="2.5" fill="none" />
+                    <circle cx="260" cy="54" r="12" stroke="#FF2A6D" strokeWidth="2.5" fill="none" />
                     <path
-                      d="M234 78 L260 88 L286 78 M260 88 L260 118 M260 118 L242 140 M260 118 L278 140"
-                      stroke="#64748B"
-                      strokeWidth="2.5"
+                      d="M232 56 L260 84 L288 56 M260 84 L260 118 M260 118 L242 144 M260 118 L278 144"
+                      stroke="#FF2A6D"
+                      strokeWidth="3"
                       strokeLinecap="round"
                       fill="none"
                     />
                   </svg>
-                  <span className="absolute right-3 top-3 rounded-md border border-slate-700 bg-[#0E131E] px-2.5 py-1 text-xs font-semibold text-slate-300">
-                    Coming Soon
-                  </span>
                 </div>
 
                 <div className="p-5">
                   <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <span>2 Players</span>
+                    <span className="font-semibold text-rose-300">Playable</span>
                     <span aria-hidden="true">·</span>
-                    <span>Full Body Pose</span>
+                    <span>1–2 Players</span>
+                    <span aria-hidden="true">·</span>
+                    <span>60s Match</span>
                   </div>
-                  <h3 className="mt-2 font-display text-xl font-bold text-slate-200">
+                  <h3 className="mt-2 font-display text-xl font-bold text-white">
                     Pose Match Battle
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                    Strike high-speed silhouette poses before the neon wall closes in. Precision joint matching decides who clears each round.
+                  <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                    Match neon silhouette poses using 8-joint angle scoring. Trigger 3-combo sabotages, dodge red Fake-Outs, and win 2x Overdrive.
                   </p>
                 </div>
               </div>
 
               <div className="px-5 pb-5">
-                <button
-                  type="button"
-                  disabled
-                  className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-800 bg-[#121724] px-4 py-2.5 text-sm font-semibold text-slate-500"
+                <Link
+                  href="/games/pose-match-battle"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-rose-400"
                 >
-                  <Lock className="h-4 w-4" aria-hidden="true" />
-                  <span>Coming Soon</span>
-                </button>
+                  <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                  <span>Play Pose Match Battle</span>
+                </Link>
               </div>
             </article>
 

@@ -1,6 +1,10 @@
 {
   "name": "Webcam Party Arcade",
   "description": "A local multiplayer webcam mini-game hub powered by MediaPipe hand tracking and 60FPS HTML5 Canvas.",
-  "requestFramePermissions": ["camera"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

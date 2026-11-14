@@ -9,7 +9,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { HandLandmarker, HandLandmarkerResult } from '@mediapipe/tasks-vision';
+import type {
+  HandLandmarker,
+  HandLandmarkerResult,
+  PoseLandmarker,
+  PoseLandmarkerResult,
+} from '@mediapipe/tasks-vision';
 
 export type CameraStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'unavailable';
 export type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -18,12 +23,15 @@ export interface MediaPipeContextValue {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   cameraStatus: CameraStatus;
   modelStatus: ModelStatus;
+  poseModelStatus: ModelStatus;
   errorMessage: string | null;
   hasStream: boolean;
   requestCamera: () => Promise<boolean>;
   stopCamera: () => void;
   initializeModel: () => Promise<void>;
+  initializePoseModel: () => Promise<void>;
   predict: (timestampMs?: number) => HandLandmarkerResult | null;
+  predictPose: (timestampMs?: number) => PoseLandmarkerResult | null;
 }
 
 const MediaPipeContext = createContext<MediaPipeContextValue | null>(null);
@@ -31,18 +39,30 @@ const MediaPipeContext = createContext<MediaPipeContextValue | null>(null);
 const HAND_LANDMARKER_MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 
+const POSE_LANDMARKER_MODEL_URL =
+  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
 export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
+
   const modelInitPromiseRef = useRef<Promise<void> | null>(null);
+  const poseInitPromiseRef = useRef<Promise<void> | null>(null);
   const cameraInitPromiseRef = useRef<Promise<boolean> | null>(null);
-  const lastVideoTimeRef = useRef<number>(-1);
-  const lastDetectTimestampRef = useRef<number>(0);
+
+  const lastHandVideoTimeRef = useRef<number>(-1);
+  const lastHandTimestampRef = useRef<number>(0);
+  const lastPoseVideoTimeRef = useRef<number>(-1);
+  const lastPoseTimestampRef = useRef<number>(0);
+
   const hasAutoInitializedRef = useRef<boolean>(false);
 
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
+  const [poseModelStatus, setPoseModelStatus] = useState<ModelStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasStream, setHasStream] = useState<boolean>(false);
 
@@ -108,6 +128,68 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     return promise;
   }, []);
 
+  const initializePoseModel = useCallback(async () => {
+    if (poseLandmarkerRef.current) {
+      setPoseModelStatus('ready');
+      return;
+    }
+    if (poseInitPromiseRef.current) {
+      return poseInitPromiseRef.current;
+    }
+
+    const promise = (async () => {
+      try {
+        setPoseModelStatus('loading');
+        const visionModule = await import('@mediapipe/tasks-vision');
+        const { FilesetResolver, PoseLandmarker: PoseLandmarkerClass } = visionModule;
+
+        const vision = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
+
+        let poseLandmarker: PoseLandmarker;
+        try {
+          poseLandmarker = await PoseLandmarkerClass.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: POSE_LANDMARKER_MODEL_URL,
+              delegate: 'GPU',
+            },
+            runningMode: 'VIDEO',
+            numPoses: 2,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          });
+        } catch {
+          poseLandmarker = await PoseLandmarkerClass.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: POSE_LANDMARKER_MODEL_URL,
+              delegate: 'CPU',
+            },
+            runningMode: 'VIDEO',
+            numPoses: 2,
+            minPoseDetectionConfidence: 0.5,
+            minPosePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          });
+        }
+
+        poseLandmarkerRef.current = poseLandmarker;
+        setPoseModelStatus('ready');
+      } catch (err) {
+        setPoseModelStatus('error');
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Unable to load MediaPipe PoseLandmarker model.';
+        setErrorMessage((prev) => prev ?? msg);
+      } finally {
+        poseInitPromiseRef.current = null;
+      }
+    })();
+
+    poseInitPromiseRef.current = promise;
+    return promise;
+  }, []);
+
   const requestCamera = useCallback(async (): Promise<boolean> => {
     if (streamRef.current && streamRef.current.active) {
       setCameraStatus('active');
@@ -125,7 +207,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         typeof navigator.mediaDevices.getUserMedia !== 'function'
       ) {
         setCameraStatus('unavailable');
-        setErrorMessage('Camera API unavailable in this browser. Mouse/touch blade mode is active.');
+        setErrorMessage('Camera API unavailable in this browser. Interactive fallback mode is active.');
         setHasStream(false);
         return false;
       }
@@ -150,17 +232,16 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         setErrorMessage(null);
         setHasStream(true);
 
-        // Kick off model load in parallel once camera succeeds
         void initializeModel();
         return true;
       } catch (err) {
         const name = err instanceof DOMException ? err.name : '';
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
           setCameraStatus('denied');
-          setErrorMessage('Camera permission was denied. Enable camera access or play with Mouse/Touch blades.');
+          setErrorMessage('Camera permission was denied. Enable camera access or use interactive fallback controls.');
         } else {
           setCameraStatus('unavailable');
-          setErrorMessage('No webcam detected. Mouse/Touch laser blade mode is ready.');
+          setErrorMessage('No webcam detected. Interactive fallback mode is ready.');
         }
         setHasStream(false);
         return false;
@@ -193,16 +274,15 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
-    // MediaPipe requires strictly increasing timestamps and a fresh video frame
-    if (video.currentTime === lastVideoTimeRef.current) {
+    if (video.currentTime === lastHandVideoTimeRef.current) {
       return null;
     }
-    lastVideoTimeRef.current = video.currentTime;
+    lastHandVideoTimeRef.current = video.currentTime;
 
     const now = timestampMs ?? performance.now();
     const safeTimestamp =
-      now > lastDetectTimestampRef.current ? now : lastDetectTimestampRef.current + 1;
-    lastDetectTimestampRef.current = safeTimestamp;
+      now > lastHandTimestampRef.current ? now : lastHandTimestampRef.current + 1;
+    lastHandTimestampRef.current = safeTimestamp;
 
     try {
       return landmarker.detectForVideo(video, safeTimestamp);
@@ -211,7 +291,31 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initialize shared camera + MediaPipe HandLandmarker once at layout mount
+  const predictPose = useCallback((timestampMs?: number): PoseLandmarkerResult | null => {
+    const landmarker = poseLandmarkerRef.current;
+    const video = videoRef.current;
+    if (!landmarker || !video || !streamRef.current) return null;
+    if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+      return null;
+    }
+
+    if (video.currentTime === lastPoseVideoTimeRef.current) {
+      return null;
+    }
+    lastPoseVideoTimeRef.current = video.currentTime;
+
+    const now = timestampMs ?? performance.now();
+    const safeTimestamp =
+      now > lastPoseTimestampRef.current ? now : lastPoseTimestampRef.current + 1;
+    lastPoseTimestampRef.current = safeTimestamp;
+
+    try {
+      return landmarker.detectForVideo(video, safeTimestamp);
+    } catch {
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     if (hasAutoInitializedRef.current) return;
     hasAutoInitializedRef.current = true;
@@ -227,6 +331,10 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         handLandmarkerRef.current.close();
         handLandmarkerRef.current = null;
       }
+      if (poseLandmarkerRef.current) {
+        poseLandmarkerRef.current.close();
+        poseLandmarkerRef.current = null;
+      }
     };
   }, [initializeModel, requestCamera]);
 
@@ -235,20 +343,26 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
       videoRef,
       cameraStatus,
       modelStatus,
+      poseModelStatus,
       errorMessage,
       hasStream,
       requestCamera,
       stopCamera,
       initializeModel,
+      initializePoseModel,
       predict,
+      predictPose,
     }),
     [
       cameraStatus,
       errorMessage,
       hasStream,
       initializeModel,
+      initializePoseModel,
       modelStatus,
+      poseModelStatus,
       predict,
+      predictPose,
       requestCamera,
       stopCamera,
     ]
@@ -256,7 +370,6 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <MediaPipeContext.Provider value={value}>
-      {/* Single shared hidden video element kept alive across route transitions */}
       <video
         ref={videoRef}
         playsInline
