@@ -194,6 +194,8 @@ export default function ArcadeHub() {
         : modelStatus === 'loading'
         ? 'Camera Active · Loading Hand Model...'
         : 'Camera Active'
+      : cameraStatus === 'starting'
+      ? 'Camera Allowed · Starting Video...'
       : cameraStatus === 'requesting'
       ? 'Requesting Camera Permission...'
       : cameraStatus === 'denied'
@@ -215,12 +217,12 @@ export default function ArcadeHub() {
           <button
             type="button"
             onClick={() => void requestCamera()}
-            disabled={cameraStatus === 'requesting'}
-            aria-busy={cameraStatus === 'requesting'}
+            disabled={cameraStatus === 'requesting' || cameraStatus === 'starting'}
+            aria-busy={cameraStatus === 'requesting' || cameraStatus === 'starting'}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-[#0E131E] px-3.5 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-400/60 hover:text-white whitespace-nowrap shrink-0"
           >
             <Camera className="h-3.5 w-3.5 text-cyan-400" aria-hidden="true" />
-            <span>{cameraStatus === 'requesting' ? 'Waiting for permission…' : cameraStatus === 'active' ? 'Camera Ready' : 'Enable Webcam'}</span>
+            <span>{cameraStatus === 'starting' ? 'Starting camera…' : cameraStatus === 'requesting' ? 'Waiting for permission…' : cameraStatus === 'active' ? 'Camera Ready' : 'Enable Webcam'}</span>
           </button>
         </div>
       </header>

@@ -113,17 +113,17 @@ export function ArcadeTitleCard({
         </div>
 
         <div className="mt-4 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-[#090D16] px-3.5 py-2 text-xs text-slate-300">
-          <span>{cameraStatusLabel}</span>
+          <span>{cameraStatus === 'starting' ? 'Camera Allowed · Starting Video...' : cameraStatusLabel}</span>
           {cameraStatus !== 'active' && (
             <button
               type="button"
               onClick={onRequestCamera}
-              disabled={cameraStatus === 'requesting'}
-              aria-busy={cameraStatus === 'requesting'}
+              disabled={cameraStatus === 'requesting' || cameraStatus === 'starting'}
+              aria-busy={cameraStatus === 'requesting' || cameraStatus === 'starting'}
               className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/20 whitespace-nowrap shrink-0"
             >
               <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{cameraStatus === 'requesting' ? 'Waiting for permission…' : 'Enable Webcam'}</span>
+              <span>{cameraStatus === 'starting' ? 'Starting camera…' : cameraStatus === 'requesting' ? 'Waiting for permission…' : 'Enable Webcam'}</span>
             </button>
           )}
         </div>
