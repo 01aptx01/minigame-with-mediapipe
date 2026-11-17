@@ -23,11 +23,13 @@ export function CameraHelp() {
   const status = poseGame ? poseModelStatus : game === 'neon-muncher' ? faceModelStatus : modelStatus;
   const retryModel = poseGame ? initializePoseModel : game === 'neon-muncher' ? initializeFaceModel : initializeModel;
 
-  if (!embedded && !cameraError && cameraStatus !== 'requesting' && status !== 'error') return null;
+  if (!embedded && !cameraError && cameraStatus !== 'requesting' && cameraStatus !== 'starting' && status !== 'error') return null;
   return (
     <div className="mt-3 w-full rounded-lg border border-slate-700 bg-[#090D16] p-3 text-left text-xs leading-relaxed text-slate-300">
       <div role="status" aria-live="polite">
-        {cameraError ? <p>{cameraError}</p> : cameraStatus === 'requesting' ? (
+        {cameraError ? <p>{cameraError}</p> : cameraStatus === 'starting' ? (
+          <p>Camera permission is granted. Starting the video… If it does not start, the button will let you retry.</p>
+        ) : cameraStatus === 'requesting' ? (
           <p>Allow Camera in your browser’s permission prompt. If it is hidden, check the camera icon beside the address bar.</p>
         ) : embedded ? <p>Playing inside a preview? Open the full page to give the game camera access.</p> : null}
         {status === 'error' && (

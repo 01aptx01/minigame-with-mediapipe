@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cameraErrorMessage, createCameraRequestGate, requestWebcam } from './access';
+import { cameraErrorMessage, createCameraRequestGate, playWebcamVideo, requestWebcam } from './access';
 
 test('camera can retry after an immediate unsupported/policy failure', async () => {
   const request = createCameraRequestGate();
@@ -48,4 +48,41 @@ test('camera failures distinguish blocked previews, denied permission, missing a
   assert.match(cameraErrorMessage(error('NotAllowedError'), false), /browser permissions/);
   assert.match(cameraErrorMessage(error('NotFoundError'), false), /No camera/);
   assert.match(cameraErrorMessage(error('NotReadableError'), false), /other apps/);
+});
+
+
+test('video playback that never settles times out and releases the request gate for a retry', async () => {
+  const request = createCameraRequestGate();
+  let calls = 0;
+  const hungVideo = { play: () => { calls++; return new Promise<void>(() => {}); } };
+  await assert.rejects(request(async () => {
+    await playWebcamVideo(hungVideo, 5);
+    return true;
+  }), { name: 'CameraPlaybackTimeoutError' });
+  assert.equal(await request(async () => {
+    await playWebcamVideo({ play: async () => { calls++; } });
+    return true;
+  }), true);
+  assert.equal(calls, 2);
+});
+
+test('video playback rejection is distinct from denied camera permission', async () => {
+  for (const play of [
+    () => Promise.reject(new DOMException('', 'NotAllowedError')),
+    () => { throw new DOMException('', 'NotAllowedError'); },
+  ]) {
+    await assert.rejects(playWebcamVideo({ play }), (error: unknown) => {
+      assert.equal((error as Error).name, 'CameraPlaybackError');
+      assert.match(cameraErrorMessage(error, false), /permission was granted/);
+      return true;
+    });
+  }
+});
+
+test('late playback completion cannot replace its timeout result', async () => {
+  let finish!: () => void;
+  const playback = playWebcamVideo({ play: () => new Promise<void>((resolve) => { finish = resolve; }) }, 5);
+  await assert.rejects(playback, { name: 'CameraPlaybackTimeoutError' });
+  finish();
+  await assert.rejects(playback, { name: 'CameraPlaybackTimeoutError' });
 });

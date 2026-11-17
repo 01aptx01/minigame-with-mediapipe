@@ -18,9 +18,9 @@ import type {
   PoseLandmarkerResult,
 } from '@mediapipe/tasks-vision';
 
-import { cameraErrorMessage, createCameraRequestGate, requestWebcam } from '@/lib/camera/access';
+import { cameraErrorMessage, createCameraRequestGate, playWebcamVideo, requestWebcam } from '@/lib/camera/access';
 
-export type CameraStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'unavailable';
+export type CameraStatus = 'idle' | 'requesting' | 'starting' | 'active' | 'denied' | 'unavailable';
 export type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface MediaPipeContextValue {
@@ -333,7 +333,8 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
       streamRef.current = stream;
       if (!videoRef.current) throw new Error('Camera preview is unavailable.');
       videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      setCameraStatus('starting');
+      await playWebcamVideo(videoRef.current);
       if (generation !== cameraGenerationRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return false;

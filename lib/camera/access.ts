@@ -44,6 +44,30 @@ export function requestWebcam(
   });
 }
 
+/** Browser video playback can remain pending even after camera permission succeeds. */
+export function playWebcamVideo(
+  video: Pick<HTMLVideoElement, 'play'>,
+  timeoutMs = 10000
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new DOMException('Camera video did not start in time.', 'CameraPlaybackTimeoutError'));
+    }, timeoutMs);
+    try {
+      Promise.resolve(video.play()).then(() => {
+        clearTimeout(timer);
+        resolve();
+      }, () => {
+        clearTimeout(timer);
+        reject(new DOMException('The browser could not play the camera video.', 'CameraPlaybackError'));
+      });
+    } catch {
+      clearTimeout(timer);
+      reject(new DOMException('The browser could not play the camera video.', 'CameraPlaybackError'));
+    }
+  });
+}
+
 export function cameraErrorMessage(error: unknown, embedded: boolean): string {
   const name = error instanceof Error ? error.name : '';
   switch (name) {
@@ -58,6 +82,10 @@ export function cameraErrorMessage(error: unknown, embedded: boolean): string {
     case 'NotReadableError':
     case 'TrackStartError':
       return 'The camera could not start. Close other apps using it and check your device’s camera privacy settings.';
+    case 'CameraPlaybackTimeoutError':
+      return 'Camera permission was granted, but the video did not start. Close other camera apps and try again, or open the full page in another browser.';
+    case 'CameraPlaybackError':
+      return 'Camera permission was granted, but this browser could not play the video. Try Enable Webcam again or open the full page in another browser.';
     case 'TimeoutError':
       return 'Still waiting for permission. Check the browser’s camera prompt, allow access, then try again.';
     case 'SecurityError':
