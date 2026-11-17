@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  output: 'standalone',
+  output: 'export',
   transpilePackages: ['motion'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'motion'],
