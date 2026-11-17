@@ -21,14 +21,15 @@ function makeHandLandmarks(extended: {
     x: 0.5,
     y: 0.7,
     z: 0,
+    visibility: 1,
   }));
   // Wrist at (0.5, 0.85)
-  arr[0] = { x: 0.5, y: 0.85, z: 0 };
+  arr[0] = { x: 0.5, y: 0.85, z: 0, visibility: 1 };
 
   const setFinger = (pipIdx: number, tipIdx: number, x: number, up: boolean) => {
-    arr[pipIdx] = { x, y: 0.62, z: 0 };
+    arr[pipIdx] = { x, y: 0.62, z: 0, visibility: 1 };
     // Extended tip is much farther from wrist than pip; curled tip is closer to wrist
-    arr[tipIdx] = { x, y: up ? 0.3 : 0.74, z: 0 };
+    arr[tipIdx] = { x, y: up ? 0.3 : 0.74, z: 0, visibility: 1 };
   };
 
   setFinger(6, 8, 0.42, extended.index);

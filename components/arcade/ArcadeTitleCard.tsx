@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { CameraHelp } from '@/components/arcade/CameraHelp';
 import { Camera, Play, User, Users } from 'lucide-react';
 import { PlayerNameInputs } from '@/components/arcade/PlayerNameInputs';
 import type { CameraStatus } from '@/contexts/MediaPipeContext';
@@ -47,7 +48,6 @@ export function ArcadeTitleCard({
   rules,
   cameraStatus,
   cameraStatusLabel,
-  errorMessage,
   onRequestCamera,
   startLabel,
   onStart,
@@ -118,16 +118,16 @@ export function ArcadeTitleCard({
             <button
               type="button"
               onClick={onRequestCamera}
+              disabled={cameraStatus === 'requesting'}
+              aria-busy={cameraStatus === 'requesting'}
               className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/20 whitespace-nowrap shrink-0"
             >
               <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Enable Webcam</span>
+              <span>{cameraStatus === 'requesting' ? 'Waiting for permission…' : 'Enable Webcam'}</span>
             </button>
           )}
         </div>
-        {errorMessage && cameraStatus !== 'active' && (
-          <p className="mt-1.5 text-xs text-slate-400">{errorMessage}</p>
-        )}
+        <CameraHelp />
 
         <div className="mt-5 flex w-full justify-center">
           <button
