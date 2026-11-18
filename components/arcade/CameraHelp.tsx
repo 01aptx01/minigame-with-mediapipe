@@ -1,23 +1,36 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ExternalLink, RotateCcw } from 'lucide-react';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
 
+function subscribeToLocation(onChange: () => void) {
+  window.addEventListener('popstate', onChange);
+  window.addEventListener('hashchange', onChange);
+  return () => {
+    window.removeEventListener('popstate', onChange);
+    window.removeEventListener('hashchange', onChange);
+  };
+}
+
+function getEmbeddedPageUrl() {
+  return window.self === window.top ? '' : window.location.href;
+}
+
+function getServerPageUrl() {
+  return '';
+}
+
 /** Camera guidance stays visible on the hub and every game's start screen. */
 export function CameraHelp() {
-  const [fullPageUrl, setFullPageUrl] = useState('');
-  const [embedded, setEmbedded] = useState(false);
+  const fullPageUrl = useSyncExternalStore(subscribeToLocation, getEmbeddedPageUrl, getServerPageUrl);
+  const embedded = Boolean(fullPageUrl);
   const game = useSearchParams().get('game');
   const {
     cameraStatus, cameraError, modelStatus, poseModelStatus, faceModelStatus,
     initializeModel, initializePoseModel, initializeFaceModel,
   } = useMediaPipe();
-  useEffect(() => {
-    setEmbedded(window.self !== window.top);
-    setFullPageUrl(window.location.href);
-  }, [game]);
 
   const poseGame = game === 'pose-match-battle' || game === 'rhythm-dodge';
   const status = poseGame ? poseModelStatus : game === 'neon-muncher' ? faceModelStatus : modelStatus;
@@ -37,7 +50,7 @@ export function CameraHelp() {
         )}
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        {embedded && fullPageUrl && (
+        {fullPageUrl && (
           <a href={fullPageUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-md bg-cyan-400 px-3 py-2 font-semibold text-slate-950 hover:bg-cyan-300">
             <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             Open full page for webcam

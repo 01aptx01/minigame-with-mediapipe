@@ -409,8 +409,9 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Request permission only from an explicit Enable Webcam click.
+    const generation = cameraGenerationRef;
     return () => {
-      cameraGenerationRef.current++;
+      generation.current++;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
