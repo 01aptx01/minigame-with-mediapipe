@@ -1,582 +1,499 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Gamepad2, Play, Sparkles, Video } from 'lucide-react';
-import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
-import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
-import { PlayerNameInputs } from '@/components/arcade/PlayerNameInputs';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ArcadePhase } from '@/components/arcade/ArcadeGameShell';
+import { LeaderboardPanel } from '@/components/arcade/LeaderboardPanel';
+import { SixSevenInterface } from '@/components/six-seven/SixSevenInterface';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import { useSixSevenReplay } from '@/hooks/useSixSevenReplay';
 import {
   createSixSevenState,
+  isSixSevenPoseVisible,
   registerSixSevenPracticeHit,
   resetSixSevenTracking,
   updateSixSevenGesture,
+  type SixSevenHit,
+  type SixSevenLandmark,
+  type SixSevenSide,
 } from '@/lib/games/six-seven/engine';
-import type {
-  SixSevenHit,
-  SixSevenLandmark,
-  SixSevenState,
-} from '@/lib/games/six-seven/engine';
-import {
-  drawSixSevenStage,
-  drawSixSevenVideo,
-  promptForSixSeven,
-  type SixSevenStageHit,
-} from '@/lib/games/six-seven/stage';
-import type { ArcadePhase } from '@/components/arcade/ArcadeGameShell';
+import { createSixSevenPoseTracker, type SixSevenPoseTracker } from '@/lib/games/six-seven/pose-tracker';
+import { SIX_SEVEN_CAPTURE_FPS } from '@/lib/games/six-seven/replay';
+import { drawSixSevenClipHud, drawSixSevenStage, SIX_SEVEN_HIT_MS } from '@/lib/games/six-seven/stage';
 
 const ROUND_SECONDS = 30;
-const POSE_DROPOUT_MS = 850;
-const INITIAL_TRACKING_MESSAGE = 'Practice is ready. Use A / ← for left, D / → for right.';
+const COUNTDOWN_MS = 3000;
+const POSE_LOST_MS = 300;
+const CLIP_FRAME_MS = 1000 / SIX_SEVEN_CAPTURE_FPS;
 type InputMode = 'camera' | 'practice';
+type Tracking = 'off' | 'looking' | 'ready' | 'lost';
 
-interface RoundClock {
-  remainingSec: number;
-  inputMode: InputMode;
-  startedAtMs: number | null;
-  totalPausedMs: number;
+interface Round {
+  startsAtMs: number;
   pausedAtMs: number | null;
-  ended: boolean;
+  displayedCountdown: number | null;
+  displayedSeconds: number;
+  wantsClip: boolean;
+  recordingStarted: boolean;
 }
 
-function remainingAt(clock: RoundClock, nowMs: number): number {
-  if (clock.startedAtMs === null) return ROUND_SECONDS;
-  const effectiveNow = clock.pausedAtMs ?? nowMs;
-  const activeElapsedMs = Math.max(0, effectiveNow - clock.startedAtMs - clock.totalPausedMs);
-  return Math.max(0, ROUND_SECONDS - activeElapsedMs / 1000);
-}
+const TRACKING_MESSAGES: Record<Tracking, string> = {
+  off: 'Enable your camera to see your wrists on the stage.',
+  looking: 'Step back until both shoulders and wrists are in the frame.',
+  ready: 'Both wrists in view.',
+  lost: 'Bring both shoulders and wrists back into view.',
+};
 
-function poseHasVisibleBodyAnchors(pose: readonly SixSevenLandmark[] | undefined): boolean {
-  if (!pose) return false;
-  return [11, 12, 15, 16].every((index) => {
-    const landmark = pose[index];
-    return Boolean(
-      landmark &&
-        Number.isFinite(landmark.x) &&
-        Number.isFinite(landmark.y) &&
-        landmark.x >= 0 && landmark.x <= 1 &&
-        landmark.y >= 0 && landmark.y <= 1 &&
-        (landmark.visibility === undefined || landmark.visibility >= 0.45)
-    );
-  });
+function secondsRemaining(round: Round, nowMs: number) {
+  const elapsedMs = Math.max(0, (round.pausedAtMs ?? nowMs) - round.startsAtMs);
+  return Math.max(0, ROUND_SECONDS - elapsedMs / 1000);
 }
 
 export default function SixSevenGame() {
+  const { videoRef, cameraStatus, cameraError, requestCamera } = useMediaPipe();
   const {
-    videoRef,
-    cameraStatus,
-    poseModelStatus,
-    errorMessage,
-    requestCamera,
-    initializePoseModel,
-    predictPose,
-  } = useMediaPipe();
-
-  const {
-    canvasRef,
-    sizeRef,
-    hudHandleRef,
-    audioRef,
-    phase,
-    setPhase,
-    p1Name,
-    p2Name,
-    resolvedP1Name,
-    handleP1NameChange,
-    handleP2NameChange,
-    isMuted,
-    toggleMute,
-    scoreboard,
-    newEntryIds,
-    setNewEntryIds,
-    recordScoreboardRound,
-    handleClearScoreboard,
+    canvasRef, sizeRef, audioRef, phase, setPhase, p1Name, handleP1NameChange,
+    isMuted, toggleMute, scoreboard, newEntryIds, setNewEntryIds,
+    recordScoreboardRound, handleClearScoreboard,
   } = useArcadeSession('six-seven', 'title', 'solo');
+  const {
+    clips, recording, status: clipStatus, supported: clipSupported,
+    start: startClip, pause: pauseClip, resume: resumeClip, finish: finishClip, discard: discardClip, remove: removeClip,
+  } = useSixSevenReplay();
 
-  const gameStateRef = useRef<SixSevenState>(createSixSevenState());
-  const phaseRef = useRef<ArcadePhase>(phase);
-  const inputModeRef = useRef<InputMode>('practice');
-  const roundRef = useRef<RoundClock>({
-    remainingSec: ROUND_SECONDS,
-    inputMode: 'practice',
-    startedAtMs: null,
-    totalPausedMs: 0,
-    pausedAtMs: null,
-    ended: false,
-  });
-  const floatingHitsRef = useRef<SixSevenStageHit[]>([]);
-  const popupIdRef = useRef(0);
-  const trackingMessageRef = useRef(INITIAL_TRACKING_MESSAGE);
+  const [inputMode, setInputMode] = useState<InputMode>('camera');
+  const [tracking, setTracking] = useState<Tracking>('off');
+  const [modelStatus, setModelStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [clipEnabled, setClipEnabled] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [remainingSec, setRemainingSec] = useState(ROUND_SECONDS);
+  const [hitDisplay, setHitDisplay] = useState<{ score: number; nextNumber: 6 | 7 }>({ score: 0, nextNumber: 6 });
+  const [wrongPracticeSide, setWrongPracticeSide] = useState(false);
 
-  const [inputMode, setInputMode] = useState<InputMode>('practice');
-  const [activationBusy, setActivationBusy] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
-  const [trackingMessage, setTrackingMessage] = useState(INITIAL_TRACKING_MESSAGE);
-  const [nextNumber, setNextNumber] = useState<6 | 7>(6);
-  const [endSummary, setEndSummary] = useState<{ score: number; cameraRound: boolean } | null>(null);
+  const trackerRef = useRef<SixSevenPoseTracker | null>(null);
+  const mountedRef = useRef(false);
+  const modelSetupRef = useRef<AbortController | null>(null);
+  const phaseRef = useRef<ArcadePhase>('title');
+  const modeRef = useRef<InputMode>('camera');
+  const roundRef = useRef<Round | null>(null);
+  const gameRef = useRef(createSixSevenState());
+  const trackingRef = useRef<Tracking>('off');
+  const poseRef = useRef<readonly SixSevenLandmark[] | null>(null);
+  const freshPoseAtRef = useRef(0);
+  const poseEpochRef = useRef(0);
+  const reducedMotionRef = useRef(false);
+  const hitsRef = useRef<SixSevenHit[]>([]);
+  const captureContextRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const cameraInputReady = cameraStatus === 'active' && poseModelStatus === 'ready' && !activationBusy;
+  const cameraReady = cameraStatus === 'active' && modelStatus === 'ready';
+  const cameraBusy = cameraStatus === 'requesting' || cameraStatus === 'starting' || modelStatus === 'loading';
 
-  const setTrackingStatus = useCallback((message: string) => {
-    if (trackingMessageRef.current === message) return;
-    trackingMessageRef.current = message;
-    setTrackingMessage(message);
+  const changePhase = useCallback((next: ArcadePhase) => {
+    phaseRef.current = next;
+    setPhase(next);
+  }, [setPhase]);
+
+  const changeTracking = useCallback((next: Tracking) => {
+    if (trackingRef.current === next) return;
+    trackingRef.current = next;
+    setTracking(next);
   }, []);
 
-  const syncHudDom = useCallback((state: SixSevenState, remainingSec: number) => {
-    hudHandleRef.current?.updateHud({
-      timeRemaining: remainingSec,
-      p1Score: state.score,
-      p1Meta: `NEXT · ${state.nextNumber} · ${state.nextNumber === 6 ? 'LEFT' : 'RIGHT'}`,
-      tugRatio: 1,
-      tugDividerPercent: 100,
-    });
-  }, [hudHandleRef]);
-
-  const handleHit = useCallback((hit: SixSevenHit) => {
-    floatingHitsRef.current.push({ ...hit, id: popupIdRef.current++ });
-    if (floatingHitsRef.current.length > 8) floatingHitsRef.current.shift();
-    audioRef.current?.playSlice(gameStateRef.current.score);
-    const nextNumber = gameStateRef.current.nextNumber;
-    setNextNumber(nextNumber);
-    setTrackingStatus(
-      `${hit.number}! ${promptForSixSeven(nextNumber)}. Keep switching.`
-    );
-    syncHudDom(gameStateRef.current, roundRef.current.remainingSec);
-  }, [audioRef, setTrackingStatus, syncHudDom]);
-
-  const handlePracticeAction = useCallback((side: 'left' | 'right') => {
-    if (phaseRef.current !== 'playing' || inputModeRef.current !== 'practice') return;
-    const nowMs = performance.now();
-    const remaining = remainingAt(roundRef.current, nowMs);
-    roundRef.current.remainingSec = remaining;
-    if (remaining <= 0 || roundRef.current.ended) return;
-
-    const hit = registerSixSevenPracticeHit(gameStateRef.current, side, nowMs);
-    if (hit) {
-      handleHit(hit);
-      return;
+  const resetPose = useCallback((clearPreview = false) => {
+    poseEpochRef.current++;
+    resetSixSevenTracking(gameRef.current);
+    if (clearPreview) {
+      poseRef.current = null;
+      freshPoseAtRef.current = 0;
     }
-    const expectedSide = gameStateRef.current.nextNumber === 6 ? 'left' : 'right';
-    setTrackingStatus(`Try the ${expectedSide} arm next · ${promptForSixSeven(gameStateRef.current.nextNumber)}.`);
-  }, [handleHit, setTrackingStatus]);
+  }, []);
 
-  const startNewRound = useCallback((selectedMode: InputMode = inputModeRef.current) => {
-    if (selectedMode === 'camera' && !cameraInputReady) return;
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-
-    const nowMs = performance.now();
-    inputModeRef.current = selectedMode;
-    setInputMode(selectedMode);
-    roundRef.current = {
-      remainingSec: ROUND_SECONDS,
-      inputMode: selectedMode,
-      startedAtMs: nowMs,
-      totalPausedMs: 0,
-      pausedAtMs: null,
-      ended: false,
-    };
-    gameStateRef.current = createSixSevenState();
-    setNextNumber(6);
-    resetSixSevenTracking(gameStateRef.current);
-    floatingHitsRef.current = [];
-    setNewEntryIds([]);
-    setEndSummary(null);
-    setTrackingStatus(selectedMode === 'camera'
-      ? 'Start hands level. Keep both shoulders and wrists visible, then raise the left arm.'
-      : 'Practice is live. Raise the left arm first, then alternate with the right.');
-    syncHudDom(gameStateRef.current, ROUND_SECONDS);
-    audioRef.current?.playCountdownTick();
-    phaseRef.current = 'playing';
-    setPhase('playing');
-  }, [audioRef, cameraInputReady, setNewEntryIds, setPhase, setTrackingStatus, syncHudDom]);
-
-  const togglePause = useCallback(() => {
-    if (phaseRef.current === 'playing') {
-      const nowMs = performance.now();
-      const remaining = remainingAt(roundRef.current, nowMs);
-      if (remaining <= 0) return;
-      roundRef.current.remainingSec = remaining;
-      roundRef.current.pausedAtMs = nowMs;
-      resetSixSevenTracking(gameStateRef.current);
-      setTrackingStatus('Paused. Resume with both hands level to reset camera tracking.');
-      syncHudDom(gameStateRef.current, remaining);
-      phaseRef.current = 'paused';
-      setPhase('paused');
-    } else if (phaseRef.current === 'paused') {
-      const nowMs = performance.now();
-      if (roundRef.current.pausedAtMs !== null) {
-        roundRef.current.totalPausedMs += Math.max(0, nowMs - roundRef.current.pausedAtMs);
-        roundRef.current.pausedAtMs = null;
-      }
-      resetSixSevenTracking(gameStateRef.current);
-      const remaining = remainingAt(roundRef.current, nowMs);
-      roundRef.current.remainingSec = remaining;
-      setTrackingStatus(roundRef.current.inputMode === 'camera'
-        ? 'Tracking reset. Start with both hands level, then follow the cue.'
-        : 'Timer resumed. Follow the next arm cue.');
-      syncHudDom(gameStateRef.current, remaining);
-      phaseRef.current = 'playing';
-      setPhase('playing');
-    }
-  }, [setPhase, setTrackingStatus, syncHudDom]);
-
-  const handleCameraSetup = useCallback(async () => {
-    setActivationBusy(true);
-    setTrackingStatus('Connecting to camera and loading body tracking…');
+  const initializePose = useCallback(async (preferWorker: boolean) => {
+    if (!mountedRef.current || modelSetupRef.current) return;
+    const scope = new AbortController();
+    modelSetupRef.current = scope;
+    setModelStatus('loading');
     try {
-      const cameraReady = cameraStatus === 'active' || await requestCamera();
-      if (!cameraReady) {
-        setTrackingStatus('Camera was not enabled. Retry setup or switch to practice.');
+      const tracker = await createSixSevenPoseTracker(scope.signal, preferWorker);
+      if (scope.signal.aborted) {
+        tracker.close();
         return;
       }
-      await initializePoseModel();
-      setTrackingStatus('Setup finished. Check the camera status above before starting.');
+      trackerRef.current = tracker;
+      setModelStatus('ready');
+    } catch {
+      if (!scope.signal.aborted) setModelStatus('error');
     } finally {
-      setActivationBusy(false);
+      if (modelSetupRef.current === scope) modelSetupRef.current = null;
     }
-  }, [cameraStatus, initializePoseModel, requestCamera, setTrackingStatus]);
-
-  const handleReplay = useCallback(() => {
-    const selectedMode = roundRef.current.inputMode;
-    if (selectedMode === 'camera' && !cameraInputReady) {
-      phaseRef.current = 'title';
-      setPhase('title');
-      return;
-    }
-    startNewRound(selectedMode);
-  }, [cameraInputReady, setPhase, startNewRound]);
-
-  useEffect(() => {
-    syncHudDom(gameStateRef.current, ROUND_SECONDS);
-  }, [syncHudDom]);
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReducedMotion(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
   }, []);
 
   useEffect(() => {
-    const handleKeys = (event: KeyboardEvent) => {
-      if (phaseRef.current !== 'playing' || inputModeRef.current !== 'practice' || event.repeat) return;
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target instanceof HTMLElement && event.target.isContentEditable)
-      ) return;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      modelSetupRef.current?.abort();
+      modelSetupRef.current = null;
+      trackerRef.current?.close();
+      trackerRef.current = null;
+    };
+  }, []);
+
+  const handleCameraSetup = useCallback(async () => {
+    if (!(cameraStatus === 'active' || await requestCamera())) return;
+    if (!trackerRef.current) await initializePose(true);
+  }, [cameraStatus, initializePose, requestCamera]);
+
+  const handleInputMode = useCallback((mode: InputMode) => {
+    if (modeRef.current === mode) return;
+    modeRef.current = mode;
+    setInputMode(mode);
+    resetPose(true);
+    changeTracking(mode === 'camera' && cameraReady ? 'looking' : 'off');
+  }, [cameraReady, changeTracking, resetPose]);
+
+  const handleHit = useCallback((hit: SixSevenHit) => {
+    hitsRef.current.push(hit);
+    setHitDisplay({ score: gameRef.current.score, nextNumber: gameRef.current.nextNumber });
+    setWrongPracticeSide(false);
+    audioRef.current?.playSlice(gameRef.current.score);
+  }, [audioRef]);
+
+  const handlePractice = useCallback((side: SixSevenSide) => {
+    const round = roundRef.current;
+    const nowMs = performance.now();
+    if (phaseRef.current !== 'playing' || modeRef.current !== 'practice' ||
+        !round || nowMs < round.startsAtMs || secondsRemaining(round, nowMs) <= 0) return;
+    const hit = registerSixSevenPracticeHit(gameRef.current, side, nowMs);
+    if (hit) handleHit(hit);
+    else setWrongPracticeSide(true);
+  }, [handleHit]);
+
+  const startRound = useCallback(() => {
+    if (modeRef.current === 'camera' && (!cameraReady || trackingRef.current !== 'ready')) return;
+    discardClip();
+    captureContextRef.current = null;
+    gameRef.current = createSixSevenState();
+    resetPose();
+    hitsRef.current = [];
+    roundRef.current = {
+      startsAtMs: performance.now() + COUNTDOWN_MS,
+      pausedAtMs: null,
+      displayedCountdown: COUNTDOWN_MS / 1000,
+      displayedSeconds: ROUND_SECONDS,
+      wantsClip: modeRef.current === 'camera' && clipEnabled && clipSupported,
+      recordingStarted: false,
+    };
+    audioRef.current?.playCountdownTick();
+    setHitDisplay({ score: 0, nextNumber: 6 });
+    setRemainingSec(ROUND_SECONDS);
+    setCountdown(COUNTDOWN_MS / 1000);
+    setWrongPracticeSide(false);
+    setNewEntryIds([]);
+    changePhase('playing');
+  }, [audioRef, cameraReady, changePhase, clipEnabled, clipSupported, discardClip, resetPose, setNewEntryIds]);
+
+  const togglePause = useCallback(() => {
+    const round = roundRef.current;
+    if (!round) return;
+    const nowMs = performance.now();
+    if (phaseRef.current === 'playing' && secondsRemaining(round, nowMs) > 0) {
+      round.pausedAtMs = nowMs;
+      pauseClip();
+      changePhase('paused');
+      resetPose(true);
+    } else if (phaseRef.current === 'paused' && round.pausedAtMs !== null) {
+      if (modeRef.current === 'camera' && !cameraReady) return;
+      round.startsAtMs += nowMs - round.pausedAtMs;
+      round.pausedAtMs = null;
+      if (modeRef.current === 'camera') changeTracking(cameraReady ? 'looking' : 'off');
+      resetPose(true);
+      resumeClip();
+      changePhase('playing');
+    }
+  }, [cameraReady, changePhase, changeTracking, pauseClip, resetPose, resumeClip]);
+
+  const backToSetup = useCallback(() => {
+    discardClip();
+    captureContextRef.current = null;
+    roundRef.current = null;
+    hitsRef.current = [];
+    setCountdown(null);
+    setRemainingSec(ROUND_SECONDS);
+    setHitDisplay({ score: 0, nextNumber: 6 });
+    setWrongPracticeSide(false);
+    resetPose();
+    changePhase('title');
+  }, [changePhase, discardClip, resetPose]);
+
+  const restartRound = useCallback(() => {
+    if (modeRef.current === 'camera' && (!cameraReady || trackingRef.current !== 'ready')) backToSetup();
+    else startRound();
+  }, [backToSetup, cameraReady, startRound]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden && phaseRef.current === 'playing') togglePause();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [togglePause]);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.repeat || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')) return;
+      const target = event.target;
+      if (target instanceof HTMLElement &&
+          (target.isContentEditable || target.closest('input, textarea, select, video'))) return;
 
       const key = event.key.toLowerCase();
-      if (key === 'a' || key === 'arrowleft') {
-        event.preventDefault();
-        handlePracticeAction('left');
-      } else if (key === 'd' || key === 'arrowright') {
-        event.preventDefault();
-        handlePracticeAction('right');
-      }
+      if ((key === 'enter' || key === ' ') && target instanceof HTMLElement &&
+          target.closest('button, a, summary')) return;
+      const currentPhase = phaseRef.current;
+      if (key === 'm') toggleMute();
+      else if ((key === 'p' || key === 'escape') && (currentPhase === 'playing' || currentPhase === 'paused')) togglePause();
+      else if (key === 'r' && currentPhase !== 'title') restartRound();
+      else if ((key === 'enter' || key === ' ') && currentPhase === 'title') startRound();
+      else if ((key === 'a' || key === 'arrowleft') && currentPhase === 'playing' && modeRef.current === 'practice') handlePractice('left');
+      else if ((key === 'd' || key === 'arrowright') && currentPhase === 'playing' && modeRef.current === 'practice') handlePractice('right');
+      else return;
+      event.preventDefault();
     };
-    window.addEventListener('keydown', handleKeys);
-    return () => window.removeEventListener('keydown', handleKeys);
-  }, [handlePracticeAction]);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [handlePractice, restartRound, startRound, toggleMute, togglePause]);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => { reducedMotionRef.current = reducedMotion.matches; };
+    update();
+    reducedMotion.addEventListener('change', update);
+    return () => reducedMotion.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const tracker = trackerRef.current;
+    if (!video || !tracker || !cameraReady || inputMode !== 'camera') return;
+
+    let cancelled = false;
+    let inFlight = false;
+    let frameId = 0;
+    let lastVideoTime = -1;
+    const useVideoFrames = typeof video.requestVideoFrameCallback === 'function';
+    const schedule = () => {
+      frameId = useVideoFrames
+        ? video.requestVideoFrameCallback(sampleFrame)
+        : requestAnimationFrame(sampleFrame);
+    };
+
+    const sampleFrame = (nowMs: number) => {
+      schedule();
+      const currentPhase = phaseRef.current;
+      if (cancelled || document.hidden || (currentPhase !== 'title' && currentPhase !== 'playing') ||
+          inFlight || video.readyState < 2 || (!useVideoFrames && video.currentTime === lastVideoTime)) return;
+
+      lastVideoTime = video.currentTime;
+      inFlight = true;
+      const epoch = poseEpochRef.current;
+      void tracker.sample(video, nowMs).then((pose) => {
+        if (cancelled || epoch !== poseEpochRef.current || document.hidden) return;
+        if (!pose || !isSixSevenPoseVisible(pose)) {
+          poseRef.current = null;
+          if (performance.now() - freshPoseAtRef.current > POSE_LOST_MS && trackingRef.current === 'ready') {
+            changeTracking('lost');
+          }
+          if (phaseRef.current === 'playing') updateSixSevenGesture(gameRef.current, null, nowMs);
+          return;
+        }
+
+        poseRef.current = pose;
+        freshPoseAtRef.current = nowMs;
+        changeTracking('ready');
+        const round = roundRef.current;
+        const receivedAtMs = performance.now();
+        if (phaseRef.current !== 'playing' || !round || receivedAtMs - nowMs > POSE_LOST_MS ||
+            secondsRemaining(round, receivedAtMs) <= 0) return;
+        const hit = updateSixSevenGesture(gameRef.current, pose, nowMs, nowMs >= round.startsAtMs);
+        if (hit) handleHit({ ...hit, atMs: receivedAtMs });
+      }).catch(() => {
+        if (cancelled || trackerRef.current !== tracker) return;
+        tracker.close();
+        trackerRef.current = null;
+        resetPose(true);
+        changeTracking('lost');
+        if (tracker.background) void initializePose(false);
+        else setModelStatus('error');
+      }).finally(() => { inFlight = false; });
+    };
+
+    changeTracking('looking');
+    schedule();
+    return () => {
+      cancelled = true;
+      if (useVideoFrames) video.cancelVideoFrameCallback(frameId);
+      else cancelAnimationFrame(frameId);
+    };
+  }, [cameraReady, changeTracking, handleHit, initializePose, inputMode, resetPose, videoRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
+    const ctx = canvas?.getContext('2d', { alpha: false });
+    if (!canvas || !ctx) return;
 
-    let rafId = 0;
-    let lastFreshPoseMs = performance.now();
-    let trackingWasResetForDropout = false;
-
-    const finishRound = () => {
-      if (roundRef.current.ended) return;
-      roundRef.current.ended = true;
-      roundRef.current.remainingSec = 0;
-      resetSixSevenTracking(gameStateRef.current);
-      audioRef.current?.playRoundEnd();
-      if (roundRef.current.inputMode === 'camera') {
-        recordScoreboardRound('solo', {
-          score: gameStateRef.current.score,
-          detail: '30s camera round',
-        });
-      }
-      setEndSummary({
-        score: gameStateRef.current.score,
-        cameraRound: roundRef.current.inputMode === 'camera',
-      });
-      syncHudDom(gameStateRef.current, 0);
-      phaseRef.current = 'gameover';
-      setPhase('gameover');
+    const resize = () => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (width === 0 || height === 0) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      sizeRef.current = { width, height };
+      needsDraw = true;
     };
 
-    const drawFrame = (nowMs: number) => {
-      rafId = requestAnimationFrame(drawFrame);
-      const { width, height } = sizeRef.current;
-      const dpr = canvas.width / Math.max(1, width);
-      const state = gameStateRef.current;
-      const isActiveRound = phase === 'playing' && !roundRef.current.ended;
+    let needsDraw = true;
+    let frameId = 0;
+    let lastVideoTime = -1;
+    let lastPose: readonly SixSevenLandmark[] | null = null;
+    let previousHadHits = false;
+    let lastClipFrameMs = 0;
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    resize();
 
-      if (isActiveRound) {
-        const remaining = remainingAt(roundRef.current, nowMs);
-        roundRef.current.remainingSec = remaining;
-        if (remaining <= 0) {
-          // Expire before reading another pose so a slow model cannot score beyond 30 seconds.
-          finishRound();
-        } else if (
-          !document.hidden &&
-          roundRef.current.inputMode === 'camera' &&
-          cameraStatus === 'active' &&
-          poseModelStatus === 'ready'
-        ) {
-          const result = predictPose(nowMs);
-          // null here may mean a duplicate video timestamp: only update the engine for fresh results.
-          if (result) {
-            lastFreshPoseMs = nowMs;
-            trackingWasResetForDropout = false;
-            const pose = result.landmarks[0] as readonly SixSevenLandmark[] | undefined;
-            const hit = updateSixSevenGesture(state, pose ?? null, nowMs);
-            if (hit) handleHit(hit);
-            if (!poseHasVisibleBodyAnchors(pose)) {
-              setTrackingStatus('Face the camera; keep both shoulders and both wrists in frame.');
-            } else if (
-              trackingMessageRef.current.startsWith('No fresh pose') ||
-              trackingMessageRef.current.startsWith('Face the camera')
-            ) {
-              setTrackingStatus('Pose visible. Start with both hands level, then follow the left/right cue.');
-            }
-          } else if (nowMs - lastFreshPoseMs > POSE_DROPOUT_MS && !trackingWasResetForDropout) {
-            resetSixSevenTracking(state);
-            trackingWasResetForDropout = true;
-            setTrackingStatus('No fresh pose. Face the camera and bring both wrists back into frame.');
+    const draw = (nowMs: number) => {
+      frameId = requestAnimationFrame(draw);
+      const { width, height } = sizeRef.current;
+      const round = roundRef.current;
+      const game = gameRef.current;
+      if (phaseRef.current === 'playing' && modeRef.current === 'camera' && cameraStatus !== 'active') {
+        togglePause();
+      }
+      const active = phaseRef.current === 'playing' && round;
+      const showingCamera = modeRef.current === 'camera' && cameraStatus === 'active';
+      const video = showingCamera ? videoRef.current : null;
+      if (showingCamera && trackingRef.current === 'ready' &&
+          (phaseRef.current === 'title' || active) && nowMs - freshPoseAtRef.current > POSE_LOST_MS) {
+        resetPose(true);
+        changeTracking('lost');
+      } else if (!showingCamera && modeRef.current === 'camera' && trackingRef.current !== 'off') {
+        resetPose(true);
+        changeTracking('off');
+      }
+
+      const pose = showingCamera ? poseRef.current : null;
+      const frame = { video, pose, hits: hitsRef.current, nowMs, nextNumber: game.nextNumber, reducedMotion: reducedMotionRef.current };
+      while (frame.hits[0] && nowMs - frame.hits[0].atMs >= SIX_SEVEN_HIT_MS) frame.hits.shift();
+
+      if (active) {
+        const left = secondsRemaining(round, nowMs);
+        const displaySeconds = Math.ceil(left);
+        const count = nowMs < round.startsAtMs ? Math.ceil((round.startsAtMs - nowMs) / 1000) : null;
+        if (round.displayedCountdown !== count) {
+          round.displayedCountdown = count;
+          setCountdown(count);
+          audioRef.current?.playCountdownTick();
+        }
+        if (round.displayedSeconds !== displaySeconds) {
+          round.displayedSeconds = displaySeconds;
+          setRemainingSec(displaySeconds);
+        }
+
+        if (count === null && round.wantsClip && !round.recordingStarted && video) {
+          round.recordingStarted = true;
+          const capture = document.createElement('canvas');
+          capture.width = 640;
+          capture.height = 412;
+          captureContextRef.current = capture.getContext('2d', { alpha: false });
+          lastClipFrameMs = -Infinity;
+        }
+
+        const captureCtx = captureContextRef.current;
+        if (captureCtx && (nowMs - lastClipFrameMs >= CLIP_FRAME_MS || left === 0)) {
+          const { width: clipWidth, height: clipHeight } = captureCtx.canvas;
+          captureCtx.save();
+          captureCtx.translate(0, 52);
+          drawSixSevenStage(captureCtx, clipWidth, clipHeight - 52, frame);
+          captureCtx.restore();
+          drawSixSevenClipHud(captureCtx, clipWidth, clipHeight, game.score, left, ROUND_SECONDS);
+          if (lastClipFrameMs === -Infinity) {
+            if (!startClip(captureCtx.canvas)) captureContextRef.current = null;
+            lastClipFrameMs = nowMs;
+          } else {
+            lastClipFrameMs = nowMs - (nowMs - lastClipFrameMs) % CLIP_FRAME_MS;
           }
+        }
+
+        if (left === 0) {
+          captureContextRef.current = null;
+          if (round.recordingStarted) finishClip(game.score, ROUND_SECONDS);
+          if (modeRef.current === 'camera') {
+            recordScoreboardRound('solo', { score: game.score, detail: '30s camera round' });
+          }
+          changePhase('gameover');
+          audioRef.current?.playRoundEnd();
         }
       }
 
-      ctx.save();
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const selectedMode = phase === 'playing' || phase === 'paused' || phase === 'gameover'
-        ? roundRef.current.inputMode
-        : inputModeRef.current;
-      const showCamera = selectedMode === 'camera' && cameraStatus === 'active';
-      const visibleVideo = showCamera ? videoRef.current : null;
-      drawSixSevenVideo(ctx, visibleVideo, width, height);
-      drawSixSevenStage(
-        ctx,
-        width,
-        height,
-        nowMs,
-        state.nextNumber,
-        reducedMotion,
-        visibleVideo,
-        floatingHitsRef.current
-      );
-      ctx.restore();
-      syncHudDom(state, roundRef.current.remainingSec);
-    };
-
-    rafId = requestAnimationFrame(drawFrame);
-    return () => cancelAnimationFrame(rafId);
-  }, [audioRef, cameraStatus, canvasRef, handleHit, phase, poseModelStatus, predictPose, recordScoreboardRound, reducedMotion, setPhase, setTrackingStatus, sizeRef, syncHudDom, videoRef]);
-
-  const handleInputMode = (nextMode: InputMode) => {
-    inputModeRef.current = nextMode;
-    setInputMode(nextMode);
-    resetSixSevenTracking(gameStateRef.current);
-    setTrackingStatus(nextMode === 'camera'
-      ? 'Camera selected. Enable camera and body tracking when ready.'
-      : 'Practice ready: A / ← for left, D / → for right.');
-  };
-
-  const titleCameraStatus = activationBusy || cameraStatus === 'requesting'
-    ? 'Waiting for camera permission and loading body tracking…'
-    : cameraStatus !== 'active'
-      ? 'Camera permission starts when you press Enable camera.'
-      : poseModelStatus === 'loading'
-        ? 'Camera is on · loading body tracking…'
-        : poseModelStatus === 'ready'
-          ? 'Camera and body tracking are ready.'
-          : poseModelStatus === 'error'
-            ? 'Camera is on · body tracking needs a retry.'
-            : 'Camera is on · press Load body tracking to continue.';
-
-  const titleOverlay = (
-    <div
-      className="w-full max-w-xl rounded-3xl border border-cyan-400/30 bg-[#0B101B]/95 p-5 shadow-[0_0_60px_rgba(0,229,255,0.12)] sm:p-7"
-      onKeyDown={(event) => {
-        if (
-          (event.key === 'Enter' || event.key === ' ') &&
-          (event.target instanceof HTMLButtonElement || event.target instanceof HTMLInputElement)
-        ) event.stopPropagation();
-      }}
-    >
-      <div className="text-center">
-        <div className="mx-auto mb-3 flex w-fit items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-[11px] font-bold tracking-[0.22em] text-cyan-200 uppercase">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-          One player · 30 seconds
-        </div>
-        <div className="mb-2 flex items-center justify-center gap-3" aria-hidden="true">
-          <span className="font-display text-6xl font-black leading-none text-cyan-300 drop-shadow-[0_0_20px_rgba(0,229,255,0.7)]">6</span>
-          <span className="text-2xl font-black text-slate-500">↔</span>
-          <span className="font-display text-6xl font-black leading-none text-rose-300 drop-shadow-[0_0_20px_rgba(255,42,109,0.65)]">7</span>
-        </div>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-white">Six Seven</h1>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-300">
-          Catch the viral left-right switch: lift your left arm while lowering your right for 6, then swap for 7. Keep the rhythm going.
-        </p>
-      </div>
-
-      <PlayerNameInputs
-        soloMode
-        p1Name={p1Name}
-        p2Name={p2Name}
-        onChangeP1Name={handleP1NameChange}
-        onChangeP2Name={handleP2NameChange}
-      />
-
-      <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-700/80 bg-[#070B13] p-1.5" role="group" aria-label="Choose input method">
-        <button
-          type="button"
-          aria-pressed={inputMode === 'camera'}
-          onClick={() => handleInputMode('camera')}
-          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 ${inputMode === 'camera' ? 'bg-rose-300 text-slate-950' : 'text-slate-200 hover:bg-slate-800'}`}
-        >
-          <Video className="h-4 w-4" aria-hidden="true" />
-          Camera
-        </button>
-        <button
-          type="button"
-          aria-pressed={inputMode === 'practice'}
-          onClick={() => handleInputMode('practice')}
-          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${inputMode === 'practice' ? 'bg-cyan-300 text-slate-950' : 'text-slate-200 hover:bg-slate-800'}`}
-        >
-          <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-          Practice
-        </button>
-      </div>
-
-      {inputMode === 'practice' ? (
-        <div className="mt-3 rounded-xl border border-cyan-500/25 bg-cyan-500/5 px-3.5 py-3 text-sm text-slate-200">
-          <p><strong className="text-cyan-200">Practice mode:</strong> use A / ← for left, D / → for right, or tap the arm buttons. Practice scores stay local and never enter the camera leaderboard.</p>
-        </div>
-      ) : (
-        <div className="mt-3 rounded-xl border border-rose-500/25 bg-rose-500/5 px-3.5 py-3 text-sm text-slate-200">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="leading-5">Face the camera, keep both shoulders and wrists in frame, palms up. Start with hands level, then lift left while lowering right.</p>
-            <button
-              type="button"
-              onClick={() => void handleCameraSetup()}
-              disabled={activationBusy || cameraInputReady || cameraStatus === 'requesting' || poseModelStatus === 'loading'}
-              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-300/40 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition-colors hover:bg-rose-300/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 disabled:cursor-wait disabled:opacity-65"
-            >
-              <Camera className="h-4 w-4" aria-hidden="true" />
-              {cameraInputReady ? 'Camera ready' : cameraStatus === 'active' && poseModelStatus === 'error' ? 'Retry body tracking' : cameraStatus === 'active' ? 'Load body tracking' : 'Enable camera'}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-slate-400" data-testid="six-seven-camera-status" role="status" aria-live="polite">{titleCameraStatus}</p>
-          {errorMessage && (cameraStatus !== 'active' || poseModelStatus === 'error') && <p className="mt-1 text-xs text-amber-200">{errorMessage}</p>}
-          {poseModelStatus === 'error' && <p className="mt-1 text-xs text-amber-200">Body tracking did not load. Retry setup or switch to practice.</p>}
-        </div>
-      )}
-
-      <div className="mt-3 rounded-xl border border-slate-700/70 bg-[#070B13] px-3.5 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold tracking-wider text-slate-300 uppercase">Next move</span>
-          <span className="rounded-full bg-cyan-300/10 px-2.5 py-1 font-mono text-sm font-black text-cyan-200">LEFT UP · 6</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800" aria-hidden="true">
-          <div className="h-full w-1/2 rounded-full bg-gradient-to-r from-cyan-300 to-rose-300" />
-        </div>
-        <p className="mt-2 text-xs leading-5 text-slate-400">Then switch: right up / left down. Your 30-second round starts when you press Start.</p>
-      </div>
-
-      <button
-        type="button"
-        data-start="true"
-        disabled={inputMode === 'camera' && !cameraInputReady}
-        onClick={() => startNewRound(inputMode)}
-        className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-[0_0_24px_rgba(0,229,255,0.22)] transition-colors hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 disabled:shadow-none"
-      >
-        <Play className="h-4 w-4 fill-current" aria-hidden="true" />
-        Start 30s {inputMode === 'camera' ? 'Camera' : 'Practice'} Round
-      </button>
-      <p className="mt-3 text-center text-[11px] text-slate-500">Camera-only leaderboard · practice scores are not submitted.</p>
-    </div>
-  );
-
-  const bottomControls = phase === 'playing' && inputMode === 'practice' ? (
-    <div className="pointer-events-auto fixed inset-x-2 bottom-2 z-20 mx-auto max-w-lg rounded-2xl border border-slate-700/80 bg-[#0D121E]/95 p-2.5 shadow-xl backdrop-blur-sm">
-      <p className="mb-2 text-center text-[11px] font-semibold text-slate-300" data-testid="six-seven-tracking-status" aria-live="polite">{trackingMessage}</p>
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Practice arm controls">
-        <button
-          type="button"
-          aria-label="Raise the left arm, lower the right arm. Keyboard shortcut A or left arrow."
-          onClick={() => handlePracticeAction('left')}
-          className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${nextNumber === 6 ? 'border-cyan-300/70 bg-cyan-300/20 text-cyan-100' : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-300/50'}`}
-        >
-          Raise left · A / ←
-        </button>
-        <button
-          type="button"
-          aria-label="Raise the right arm, lower the left arm. Keyboard shortcut D or right arrow."
-          onClick={() => handlePracticeAction('right')}
-          className={`min-h-12 rounded-xl border px-3 py-2 text-sm font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300 ${nextNumber === 7 ? 'border-rose-300/70 bg-rose-300/20 text-rose-100' : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-rose-300/50'}`}
-        >
-          Raise right · D / →
-        </button>
-      </div>
-      <p className="mt-1.5 text-center text-[10px] font-mono tracking-wide text-slate-500">P pauses · M mutes · R restarts</p>
-    </div>
-  ) : phase === 'playing' ? (
-    <div className="pointer-events-none fixed inset-x-3 bottom-2 z-20 mx-auto max-w-xl rounded-xl border border-slate-700/80 bg-[#0D121E]/90 px-3.5 py-2 text-center shadow-lg backdrop-blur-sm">
-      <p className="text-xs font-bold text-white" data-testid="six-seven-tracking-status" role="status" aria-live="polite">{trackingMessage}</p>
-      <p className="mt-1 text-[11px] text-slate-300">Both shoulders + wrists in frame · start hands level · follow the cue</p>
-    </div>
-  ) : null;
-
-  const endOverlay = endSummary ? (
-    <ArcadeEndCard
-      winnerTitle={endSummary.cameraRound ? `${resolvedP1Name} · Camera Run Complete` : 'Practice Run Complete'}
-      mode="solo"
-      topSlot={
-        <div className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-5 ${endSummary.cameraRound ? 'border-rose-400/30 bg-rose-500/5 text-rose-100' : 'border-cyan-400/30 bg-cyan-500/5 text-cyan-100'}`}>
-          {endSummary.cameraRound
-            ? 'Webcam score saved to the camera leaderboard. Practice runs do not appear there.'
-            : 'Local practice score only. This run was not saved to the camera leaderboard.'}
-        </div>
+      const videoTime = video?.currentTime ?? -1;
+      if (needsDraw || videoTime !== lastVideoTime || pose !== lastPose || frame.hits.length || previousHadHits) {
+        const dpr = canvas.width / width;
+        ctx.setTransform(dpr, 0, 0, canvas.height / height, 0, 0);
+        drawSixSevenStage(ctx, width, height, frame);
+        needsDraw = false;
+        lastVideoTime = videoTime;
+        lastPose = pose;
+        previousHadHits = frame.hits.length > 0;
       }
-      p1={{ name: resolvedP1Name, score: endSummary.score, metrics: ['30s switch round', endSummary.cameraRound ? 'Camera input' : 'Practice input'] }}
-      scoreboard={scoreboard}
-      highlightIds={newEntryIds}
-      onClearScoreboard={handleClearScoreboard}
-      replayLabel="Play another 30s round"
-      onReplay={handleReplay}
-    />
-  ) : null;
+    };
+    frameId = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+    };
+  }, [audioRef, cameraStatus, canvasRef, changePhase, changeTracking, finishClip, recordScoreboardRound, resetPose, sizeRef, startClip, togglePause, videoRef]);
+
+  const trackingMessage = inputMode === 'practice'
+    ? wrongPracticeSide ? 'Follow the highlighted side.' : 'Alternate left and right.'
+    : TRACKING_MESSAGES[tracking];
 
   return (
-    <ArcadeGameShell
-      phase={phase}
-      isMuted={isMuted}
-      initialDurationSec={ROUND_SECONDS}
-      soloMode
-      hideTugBar
-      p1Label={resolvedP1Name}
-      canvasTestId="six-seven-canvas"
+    <SixSevenInterface
       canvasRef={canvasRef}
-      sizeRef={sizeRef}
-      hudHandleRef={hudHandleRef}
-      onStart={() => startNewRound()}
-      onTogglePause={togglePause}
-      onToggleMute={toggleMute}
-      onRestart={() => startNewRound(roundRef.current.inputMode)}
-      titleOverlay={titleOverlay}
-      endOverlay={endOverlay}
-      pauseSubtitle="The 30-second timer is frozen. Reset your hands, then resume when you’re ready."
-      bottomControls={bottomControls}
+      roundSeconds={ROUND_SECONDS}
+      phase={phase}
+      inputMode={inputMode}
+      cameraReady={cameraReady}
+      cameraBusy={cameraBusy}
+      cameraError={cameraError ?? (modelStatus === 'error' ? 'Body tracking could not load. Try the camera again.' : null)}
+      tracking={tracking}
+      trackingMessage={trackingMessage}
+      countdown={countdown}
+      score={hitDisplay.score}
+      nextNumber={hitDisplay.nextNumber}
+      remainingSec={remainingSec}
+      bestScore={scoreboard[0]?.score ?? 0}
+      playerName={p1Name}
+      muted={isMuted}
+      clipEnabled={clipEnabled}
+      clipSupported={clipSupported}
+      clipStatus={phase === 'gameover' && (inputMode === 'practice' || !clipEnabled) ? '' : clipStatus}
+      clips={clips}
+      recording={recording}
+      onInputMode={handleInputMode}
+      onCameraSetup={handleCameraSetup}
+      onStart={startRound}
+      onPause={togglePause}
+      onRestart={restartRound}
+      onBackToSetup={backToSetup}
+      onMute={toggleMute}
+      onPractice={handlePractice}
+      onClipEnabled={setClipEnabled}
+      onRemoveClip={removeClip}
+      onPlayerNameChange={handleP1NameChange}
+      leaderboard={<LeaderboardPanel entries={scoreboard} highlightIds={newEntryIds} onClear={handleClearScoreboard} />}
     />
   );
 }

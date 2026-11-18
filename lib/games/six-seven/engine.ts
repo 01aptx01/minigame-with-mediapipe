@@ -49,8 +49,11 @@ const MIN_SHOULDER_WIDTH = 0.06;
 const SIDE_ENTER_THRESHOLD = 0.3;
 const SIDE_EXIT_THRESHOLD = 0.18;
 const MIN_WRIST_TRAVEL = 0.15;
-const FILTER_ALPHA = 0.45;
-const SIDE_DEBOUNCE_MS = 90;
+// Keep roughly the same smoothing in real time at 24, 30, and 60 fps. A
+// fixed EMA coefficient made high frame rates sluggish and low frame rates
+// overly reactive.
+const FILTER_TIME_CONSTANT_MS = 30;
+const SIDE_CONFIRM_MS = 30;
 const TRACKING_GAP_RESET_MS = 650;
 
 function emptyTrackingState(): SixSevenTrackingState {
@@ -120,7 +123,8 @@ export function registerSixSevenPracticeHit(
   return recordExpectedHit(state, side, side === 'left' ? 0.67 : 0.33, 0.62, nowMs);
 }
 
-function readRelativePose(pose: readonly SixSevenLandmark[]): RelativePose | null {
+function readRelativePose(pose: readonly SixSevenLandmark[] | null | undefined): RelativePose | null {
+  if (!pose) return null;
   const leftShoulder = pose[11];
   const rightShoulder = pose[12];
   const leftWrist = pose[15];
@@ -147,10 +151,12 @@ function readRelativePose(pose: readonly SixSevenLandmark[]): RelativePose | nul
   const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
   if (shoulderWidth < MIN_SHOULDER_WIDTH) return null;
 
-  const shoulderCenterY = (leftShoulder.y + rightShoulder.y) * 0.5;
   return {
-    leftY: (leftWrist.y - shoulderCenterY) / shoulderWidth,
-    rightY: (rightWrist.y - shoulderCenterY) / shoulderWidth,
+    // Reference each wrist to its own shoulder. A shoulder roll can move the
+    // wrists in opposite image-space directions even when the arms stay fixed
+    // relative to the torso; this removes that body-only motion.
+    leftY: (leftWrist.y - leftShoulder.y) / shoulderWidth,
+    rightY: (rightWrist.y - rightShoulder.y) / shoulderWidth,
     leftX: leftWrist.x,
     leftRawY: leftWrist.y,
     rightX: rightWrist.x,
@@ -158,9 +164,25 @@ function readRelativePose(pose: readonly SixSevenLandmark[]): RelativePose | nul
   };
 }
 
-function smoothPose(previous: RelativePose | null, current: RelativePose): RelativePose {
+/**
+ * Return whether all landmarks needed by the seesaw detector are usable.
+ * Readiness and scoring share this validation so the camera can never report
+ * ready for a pose that the gesture engine would immediately discard.
+ */
+export function isSixSevenPoseVisible(
+  pose: readonly SixSevenLandmark[] | null | undefined
+): boolean {
+  return readRelativePose(pose) !== null;
+}
+
+function smoothPose(
+  previous: RelativePose | null,
+  current: RelativePose,
+  elapsedMs: number
+): RelativePose {
   if (!previous) return current;
-  const mix = (before: number, after: number) => before + (after - before) * FILTER_ALPHA;
+  const alpha = 1 - Math.exp(-Math.max(0, elapsedMs) / FILTER_TIME_CONSTANT_MS);
+  const mix = (before: number, after: number) => before + (after - before) * alpha;
   return {
     leftY: mix(previous.leftY, current.leftY),
     rightY: mix(previous.rightY, current.rightY),
@@ -220,7 +242,7 @@ function advanceCandidate(state: SixSevenState, side: SixSevenSide, nowMs: numbe
   const candidateSince = state.tracking.candidateSinceMs ?? nowMs;
   return (
     state.tracking.candidateSamples >= 2 &&
-    nowMs - candidateSince >= SIDE_DEBOUNCE_MS
+    nowMs - candidateSince >= SIDE_CONFIRM_MS
   );
 }
 
@@ -229,7 +251,8 @@ function commitSide(
   side: SixSevenSide,
   current: RelativePose,
   rawPose: RelativePose,
-  nowMs: number
+  nowMs: number,
+  scoringEnabled: boolean
 ): SixSevenHit | null {
   const sourceAnchor = state.tracking.stableAnchor;
   const travelWasOpposite =
@@ -239,7 +262,7 @@ function commitSide(
   state.tracking.stableAnchor = current;
   clearCandidate(state);
 
-  if (!travelWasOpposite) return null;
+  if (!scoringEnabled || !travelWasOpposite) return null;
   const hitX = side === 'left' ? rawPose.leftX : rawPose.rightX;
   const hitY = side === 'left' ? rawPose.leftRawY : rawPose.rightRawY;
   return recordExpectedHit(state, side, hitX, hitY, nowMs);
@@ -248,18 +271,16 @@ function commitSide(
 /**
  * Update the seesaw detector once per fresh MediaPipe pose result. A null pose
  * breaks continuity and reacquires a baseline on the next visible detection.
+ * Set scoringEnabled to false during a countdown to warm up tracking without
+ * changing score or nextNumber.
  */
 export function updateSixSevenGesture(
   state: SixSevenState,
-  pose: readonly SixSevenLandmark[] | null,
-  nowMs: number
+  pose: readonly SixSevenLandmark[] | null | undefined,
+  nowMs: number,
+  scoringEnabled = true
 ): SixSevenHit | null {
   if (!Number.isFinite(nowMs)) {
-    resetSixSevenTracking(state);
-    return null;
-  }
-
-  if (!pose) {
     resetSixSevenTracking(state);
     return null;
   }
@@ -271,14 +292,18 @@ export function updateSixSevenGesture(
   }
 
   const tracking = state.tracking;
+  let elapsedMs = tracking.lastSampleAtMs === null
+    ? 0
+    : nowMs - tracking.lastSampleAtMs;
   if (
     tracking.lastSampleAtMs !== null &&
     (nowMs < tracking.lastSampleAtMs || nowMs - tracking.lastSampleAtMs > TRACKING_GAP_RESET_MS)
   ) {
     resetSixSevenTracking(state);
+    elapsedMs = 0;
   }
 
-  const current = smoothPose(state.tracking.filteredPose, relativePose);
+  const current = smoothPose(state.tracking.filteredPose, relativePose, elapsedMs);
   const previousStableSide = state.tracking.stableSide;
   const observedSide = classifySide(current, previousStableSide);
   state.tracking.filteredPose = current;
@@ -296,7 +321,7 @@ export function updateSixSevenGesture(
           state.tracking.neutralSamples += 1;
           if (
             state.tracking.neutralSamples >= 2 &&
-            nowMs - state.tracking.neutralSinceMs >= SIDE_DEBOUNCE_MS
+            nowMs - state.tracking.neutralSinceMs >= SIDE_CONFIRM_MS
           ) {
             // A settled, level start is a valid motion origin. The first true
             // left-up/right-down travel can therefore earn the opening 6.
@@ -313,7 +338,7 @@ export function updateSixSevenGesture(
     const hasNeutralBaseline = state.tracking.stableAnchor !== null;
     if (!advanceCandidate(state, observedSide, nowMs)) return null;
     if (hasNeutralBaseline) {
-      return commitSide(state, observedSide, current, relativePose, nowMs);
+      return commitSide(state, observedSide, current, relativePose, nowMs, scoringEnabled);
     }
 
     state.tracking.stableSide = observedSide;
@@ -336,5 +361,5 @@ export function updateSixSevenGesture(
   }
 
   if (!advanceCandidate(state, observedSide, nowMs)) return null;
-  return commitSide(state, observedSide, current, relativePose, nowMs);
+  return commitSide(state, observedSide, current, relativePose, nowMs, scoringEnabled);
 }

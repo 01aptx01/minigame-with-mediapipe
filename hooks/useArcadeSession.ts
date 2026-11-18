@@ -35,7 +35,7 @@ export function useArcadeSession(
   const [p1Name, setP1Name] = useState<string>('');
   const [p2Name, setP2Name] = useState<string>('');
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>([]);
+  const [scoreboard, setScoreboard] = useState<ScoreboardEntry[]>(() => loadScoreboard(gameSlug));
   const [newEntryIds, setNewEntryIds] = useState<string[]>([]);
 
   useEffect(() => {
