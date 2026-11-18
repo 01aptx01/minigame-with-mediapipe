@@ -3,7 +3,8 @@ export type GameSlug =
   | 'pose-match-battle'
   | 'rhythm-dodge'
   | 'sorcerers-duel'
-  | 'neon-muncher';
+  | 'neon-muncher'
+  | 'six-seven';
 export type ScoreboardMode = '1v1' | 'solo';
 
 export interface ScoreboardEntry {

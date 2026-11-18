@@ -18,7 +18,9 @@ import type {
   PoseLandmarkerResult,
 } from '@mediapipe/tasks-vision';
 
-export type CameraStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'unavailable';
+import { cameraErrorMessage, createCameraRequestGate, playWebcamVideo, requestWebcam } from '@/lib/camera/access';
+
+export type CameraStatus = 'idle' | 'requesting' | 'starting' | 'active' | 'denied' | 'unavailable';
 export type ModelStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface MediaPipeContextValue {
@@ -28,6 +30,7 @@ export interface MediaPipeContextValue {
   poseModelStatus: ModelStatus;
   faceModelStatus: ModelStatus;
   errorMessage: string | null;
+  cameraError: string | null;
   hasStream: boolean;
   requestCamera: () => Promise<boolean>;
   stopCamera: () => void;
@@ -42,16 +45,16 @@ export interface MediaPipeContextValue {
 const MediaPipeContext = createContext<MediaPipeContextValue | null>(null);
 
 const HAND_LANDMARKER_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+  '/mediapipe/models/hand_landmarker.task';
 
 const POSE_LANDMARKER_FULL_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
+  '/mediapipe/models/pose_landmarker_full.task';
 
 const POSE_LANDMARKER_LITE_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+  '/mediapipe/models/pose_landmarker_lite.task';
 
 const FACE_LANDMARKER_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+  '/mediapipe/models/face_landmarker.task';
 
 type VisionFileset = Awaited<
   ReturnType<(typeof import('@mediapipe/tasks-vision'))['FilesetResolver']['forVisionTasks']>
@@ -112,25 +115,30 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   const modelInitPromiseRef = useRef<Promise<void> | null>(null);
   const poseInitPromiseRef = useRef<Promise<void> | null>(null);
   const faceInitPromiseRef = useRef<Promise<void> | null>(null);
-  const cameraInitPromiseRef = useRef<Promise<boolean> | null>(null);
+  const cameraRequestGate = useRef(createCameraRequestGate());
+  const cameraGenerationRef = useRef(0);
 
   const handCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
   const poseCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
   const faceCursorRef = useRef<VideoTrackCursor>({ lastVideoTime: -1, lastTimestamp: 0 });
-  const hasAutoInitializedRef = useRef<boolean>(false);
+
 
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
   const [modelStatus, setModelStatus] = useState<ModelStatus>('idle');
   const [poseModelStatus, setPoseModelStatus] = useState<ModelStatus>('idle');
   const [faceModelStatus, setFaceModelStatus] = useState<ModelStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [hasStream, setHasStream] = useState<boolean>(false);
 
   const getVisionModuleAndFileset = useCallback(async () => {
     const visionModule = await import('@mediapipe/tasks-vision');
     if (!visionFilesetPromiseRef.current) {
       visionFilesetPromiseRef.current =
-        visionModule.FilesetResolver.forVisionTasks('/mediapipe/wasm');
+        visionModule.FilesetResolver.forVisionTasks('/mediapipe/wasm').catch((error) => {
+          visionFilesetPromiseRef.current = null;
+          throw error;
+        });
     }
     const vision = await visionFilesetPromiseRef.current;
     return { visionModule, vision };
@@ -278,73 +286,86 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     return promise;
   }, [getVisionModuleAndFileset]);
 
-  const requestCamera = useCallback(async (): Promise<boolean> => {
-    if (streamRef.current && streamRef.current.active) {
+  const requestCamera = useCallback((): Promise<boolean> => cameraRequestGate.current(async () => {
+    if (streamRef.current?.active) {
       setCameraStatus('active');
       setHasStream(true);
       return true;
     }
-    if (cameraInitPromiseRef.current) {
-      return cameraInitPromiseRef.current;
+
+    const generation = ++cameraGenerationRef.current;
+    const embedded = window.self !== window.top;
+    const policy = (document as Document & {
+      permissionsPolicy?: { allowsFeature: (name: string) => boolean };
+      featurePolicy?: { allowsFeature: (name: string) => boolean };
+    }).permissionsPolicy ?? (document as Document & {
+      featurePolicy?: { allowsFeature: (name: string) => boolean };
+    }).featurePolicy;
+
+    const fail = (status: CameraStatus, message: string) => {
+      setCameraStatus(status);
+      setCameraError(message);
+      setHasStream(false);
+      return false;
+    };
+    if (!window.isSecureContext) {
+      return fail('unavailable', 'Camera access needs HTTPS. Open the secure full-page site.');
+    }
+    if (policy && !policy.allowsFeature('camera')) {
+      return fail('denied', embedded
+        ? 'Camera access is blocked inside this preview. Open the full page to enable your webcam.'
+        : 'This page’s security policy blocks the camera. Camera access cannot be enabled here.');
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return fail('unavailable', 'Camera access is unavailable here. Open the full page in Chrome or Safari.');
     }
 
-    const promise = (async () => {
-      if (
-        typeof navigator === 'undefined' ||
-        !navigator.mediaDevices ||
-        typeof navigator.mediaDevices.getUserMedia !== 'function'
-      ) {
-        setCameraStatus('unavailable');
-        setErrorMessage(
-          'Camera API unavailable in this browser. Interactive fallback mode is active.'
-        );
-        setHasStream(false);
+    setCameraStatus('requesting');
+    setCameraError(null);
+    let acquiredStream: MediaStream | null = null;
+    try {
+      const stream = await requestWebcam(navigator.mediaDevices);
+      acquiredStream = stream;
+      if (generation !== cameraGenerationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
         return false;
       }
-
-      setCameraStatus('requesting');
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: 'user',
-          },
-          audio: false,
-        });
-
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => {});
-        }
-        setCameraStatus('active');
-        setErrorMessage(null);
-        setHasStream(true);
-        return true;
-      } catch (err) {
-        const name = err instanceof DOMException ? err.name : '';
-        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-          setCameraStatus('denied');
-          setErrorMessage(
-            'Camera permission was denied. Enable camera access or use interactive fallback controls.'
-          );
-        } else {
-          setCameraStatus('unavailable');
-          setErrorMessage('No webcam detected. Interactive fallback mode is ready.');
-        }
-        setHasStream(false);
+      streamRef.current = stream;
+      if (!videoRef.current) throw new Error('Camera preview is unavailable.');
+      videoRef.current.srcObject = stream;
+      setCameraStatus('starting');
+      await playWebcamVideo(videoRef.current);
+      if (generation !== cameraGenerationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
         return false;
-      } finally {
-        cameraInitPromiseRef.current = null;
       }
-    })();
-
-    cameraInitPromiseRef.current = promise;
-    return promise;
-  }, []);
+      for (const cursor of [handCursorRef, poseCursorRef, faceCursorRef]) {
+        cursor.current.lastVideoTime = -1;
+      }
+      for (const track of stream.getVideoTracks()) {
+        track.addEventListener('ended', () => {
+          if (streamRef.current !== stream) return;
+          streamRef.current = null;
+          fail('unavailable', 'The camera disconnected. Reconnect it and enable the webcam again.');
+        }, { once: true });
+      }
+      setCameraStatus('active');
+      setCameraError(null);
+      setHasStream(true);
+      return true;
+    } catch (error) {
+      acquiredStream?.getTracks().forEach((track) => track.stop());
+      if (generation !== cameraGenerationRef.current) return false;
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      const denied = error instanceof Error && ['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error.name);
+      return fail(denied ? 'denied' : 'unavailable', cameraErrorMessage(error, embedded));
+    }
+  }), []);
 
   const stopCamera = useCallback(() => {
+    cameraGenerationRef.current++;
+    setCameraError(null);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -387,13 +408,10 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!hasAutoInitializedRef.current) {
-      hasAutoInitializedRef.current = true;
-      void requestCamera();
-    }
-
+    // Request permission only from an explicit Enable Webcam click.
+    const generation = cameraGenerationRef;
     return () => {
-      hasAutoInitializedRef.current = false;
+      generation.current++;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -411,7 +429,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
         faceLandmarkerRef.current = null;
       }
     };
-  }, [requestCamera]);
+  }, []);
 
   const value = useMemo<MediaPipeContextValue>(
     () => ({
@@ -420,7 +438,8 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
       modelStatus,
       poseModelStatus,
       faceModelStatus,
-      errorMessage,
+      errorMessage: cameraError ?? errorMessage,
+      cameraError,
       hasStream,
       requestCamera,
       stopCamera,
@@ -433,6 +452,7 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       cameraStatus,
+      cameraError,
       errorMessage,
       faceModelStatus,
       hasStream,
