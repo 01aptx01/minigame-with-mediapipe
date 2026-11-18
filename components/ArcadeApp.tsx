@@ -31,6 +31,10 @@ const NeonMuncherGame = dynamic(() => import('@/components/NeonMuncherGame'), {
   ssr: false,
   loading: GameLoadingFallback,
 });
+const SixSevenGame = dynamic(() => import('@/components/SixSevenGame'), {
+  ssr: false,
+  loading: GameLoadingFallback,
+});
 
 export default function ArcadeApp() {
   const searchParams = useSearchParams();
@@ -47,6 +51,8 @@ export default function ArcadeApp() {
       return <SorcerersDuelGame />;
     case 'neon-muncher':
       return <NeonMuncherGame />;
+    case 'six-seven':
+      return <SixSevenGame />;
     default:
       return <ArcadeHub />;
   }
