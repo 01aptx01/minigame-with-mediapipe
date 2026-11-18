@@ -1,0 +1,211 @@
+<div align="center">
+  <img src="docs/images/logo.png" width="120" alt="Webcam Party Arcade logo" />
+  <h1>Webcam Party Arcade</h1>
+  <p>Five local mini-games for solo runs and same-device duels, powered by webcam-based MediaPipe tracking.</p>
+
+  ![Next.js 15](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs)
+  ![MediaPipe Tasks Vision 1.2.3](https://img.shields.io/badge/MediaPipe%20Tasks%20Vision-1.2.3-4285F4?logo=google)
+  ![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-informational)
+
+  [Docs](#getting-started) · [Demo](#screenshots) · [Report Bug](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Bug%20report) · [Request Feature](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Feature%20request)
+</div>
+
+No public live demo is listed for this repository. The Demo link opens the screenshot gallery; use Quick Start to run the games locally.
+
+## Table of Contents
+
+- [About](#about)
+- [Features](#features)
+  - [Screenshots](#screenshots)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+  - [Validation](#validation)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+## About
+
+Webcam Party Arcade is a browser-based collection of five mini-games for one or two people sharing a device. Hand, pose, and face landmarks are processed in the browser with MediaPipe Tasks Vision. Webcam play is optional: each game has pointer, keyboard, or on-screen practice controls for trying it without camera tracking.
+
+The 1v1 mode is local split-screen play; it does not use online matchmaking. Player names last for the current page session, while completed scores are stored in that browser's `localStorage`.
+
+### Architecture
+
+- `app/page.tsx` loads the arcade hub. `components/ArcadeApp.tsx` selects a game from the `?game=` query parameter.
+- `contexts/MediaPipeContext.tsx` owns the shared camera stream and hand, pose, and face landmarker instances. The MediaPipe WebAssembly files are served from `public/mediapipe/wasm`; task model files are fetched from Google Cloud Storage when a model is initialized.
+- Each game has a canvas/UI component in `components/` and game rules in `lib/games/<game>/`. Shared canvas, audio, session, and local scoreboard code lives in `lib/games/shared/`, `components/arcade/`, and `hooks/useArcadeSession.ts`.
+
+## Features
+
+- **Neon Slash Duel** — swipe through gems, avoid skull bombs, and send short glitches to the other player's half. 60-second rounds.
+- **Pose Match Battle** — hold the prompted pose to score with 80%+ joint accuracy, dodge Fake-Outs, and compete for overdrive bonuses. The end card can show an MVP snapshot of the highest-scoring pose. 60-second rounds.
+- **Rhythm Dodge** — lean and duck to avoid lasers on a 128 BPM beat. 60-second rounds.
+- **Sorcerer's Duel** — cast Lightning, Reflect Shield, and Arcane Fist spells with hand gestures. Play solo against the Arcane Bot or in a 1v1 duel. 60-second rounds.
+- **Neon Muncher** — open your mouth to catch snacks and close it to deflect bombs. A triggered Shame Cam moment can produce a downloadable snapshot in the end card.
+- **Solo and 1v1 modes** with editable player names. Names are trimmed and limited to 18 characters.
+- **Browser-local scoreboards** retain up to eight entries per game; the end screen displays the top five and can clear that game's scores.
+- **Camera-free controls** include pointer input, keyboard input, or on-screen buttons depending on the game. Denying camera permission or playing without a webcam leaves these practice controls available.
+- **Generated sound effects** can be muted in the game HUD or with the `M` key.
+
+### Screenshots
+
+![Arcade hub showing the five-game lineup](docs/images/arcade-hub.png)
+
+*The hub links to all five games.*
+
+![Neon Muncher game screen with a player character and falling snacks](docs/images/neon-muncher.png)
+
+*Neon Muncher turns mouth-open and mouth-closed actions into arcade controls.*
+
+![Neon Slash Duel split arena with colored blades and targets](docs/images/neon-slash.png)
+
+*Neon Slash Duel gives each player a side of the arena.*
+
+![Pose Match Battle arena with a target pose, player match indicators, and practice buttons](docs/images/pose-match.png)
+
+*Practice buttons let Player 1 try the pose-matching rules without a webcam.*
+
+![Rhythm Dodge arena with laser obstacles and player markers](docs/images/rhythm-dodge.png)
+
+*Rhythm Dodge challenges players to move and duck around incoming lasers.*
+
+![Sorcerer's Duel arena with three colored spell types](docs/images/sorcerers-duel.png)
+
+*Sorcerer's Duel uses three hand-shaped spells in its arena.*
+
+![Neon Slash Duel title screen with 1v1 and Solo buttons, optional name fields, Enable Webcam, and Pointer Blade mode](docs/images/webcam-controls.png)
+
+*Choose a mode, add optional player names, and enable the webcam or play with pointer input.*
+
+![Arcade scoreboard with player names and scores](docs/images/leaderboard.png)
+
+*End cards show the local scoreboard for that game.*
+
+![Neon Muncher Shame Cam download card showing a game-canvas snapshot and Save Photo link](docs/images/shame-cam.png)
+
+*This example was captured with camera-free fallback input. During webcam play, the rendered game canvas may include the live camera view; Shame Cam downloads a crop from that canvas.*
+
+## Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) to install the dependencies from `bun.lock` and run the project scripts.
+- Node.js LTS to run the production standalone server.
+- A modern browser with webcam support for MediaPipe tracking. Grant camera permission when prompted; the fallback controls work without a camera.
+- An internet connection on first use of each tracker so the MediaPipe task model can be downloaded. The WebAssembly runtime files are included in the repository.
+
+### Installation
+
+```bash
+git clone https://github.com/01aptx01/minigame-with-mediapipe.git
+cd minigame-with-mediapipe
+bun install --frozen-lockfile
+```
+
+### Quick Start
+
+```bash
+bun run dev
+```
+
+Open the local URL printed by Next.js (normally `http://localhost:3000`). Choose a game, click or tap Solo or 1v1, enter names if you like, and start a round. The app requests camera access when it loads; if you decline, use that game's fallback controls.
+
+### Run a standalone build locally
+
+`next.config.ts` sets `output: 'standalone'`. The standalone directory needs the static assets and public files copied alongside it before launch:
+
+```bash
+bun run build
+cp -a public .next/standalone/
+cp -a .next/static .next/standalone/.next/
+HOSTNAME=127.0.0.1 PORT=3102 node .next/standalone/server.js
+```
+
+Open `http://127.0.0.1:3102` to use the standalone build locally.
+
+On a deployed site, serve the app over HTTPS for camera access. If it is embedded in an iframe, the host page must grant that frame camera permission.
+
+## Usage
+
+### Choose a game
+
+The arcade hub links to each game. The game page lets you choose Solo or 1v1 and set player names. A blank name uses `Solo Player`, `Player 1`, or `Player 2` by default. 1v1 is played on the same screen with each player's tracked hand, face, or body assigned to a side.
+
+### Camera and fallback controls
+
+The app requests a front-facing camera with 1280×720 as the ideal resolution and no audio. Tracking runs against the browser's video stream. Hand tracking supports up to four hands; pose and face trackers each support up to two people. The app tries GPU inference first and falls back to CPU; the pose tracker also falls back from the full model to the lite model if needed.
+
+If camera permission is denied or no webcam is available, each game exposes a fallback. The available fallback inputs are:
+
+| Game | Camera-free controls |
+| --- | --- |
+| Neon Slash Duel | Move a mouse or touch pointer across the canvas to create a blade; press and drag also works. |
+| Pose Match Battle | Player 1 can press and hold a pose button shown below the game canvas. |
+| Rhythm Dodge | Player 1: `A`/`D` to move and `S` to duck (arrow keys also work). Player 2: `J`/`L` to move and `K` to duck. On-screen buttons control Player 1. |
+| Sorcerer's Duel | Player 1: `1`/`2`/`3` or `Q`/`W`/`E`; Player 2: `7`/`8`/`9`. On-screen buttons control Player 1. |
+| Neon Muncher | Player 1: `A`/`D` to move, `W` or `Space` to open, and `Q`/`E` to tilt. Player 2: left/right/up arrows. On-screen buttons control Player 1. |
+
+### Round controls
+
+- `Enter` or `Space` starts from the title screen.
+- `P` or `Esc` pauses or resumes a round.
+- `M` toggles sound effects.
+- `R` restarts the current round.
+- The same actions are available from the game HUD.
+
+Use mouse or touch to choose Solo or 1v1; `Enter` and `Space` start the round rather than selecting a mode.
+
+Most games run for 60 seconds; Neon Muncher runs for 45 seconds. The end screen shows the result and local scoreboard. Pose Match can show an MVP snapshot, and Neon Muncher can show a Shame Cam snapshot with a Save Photo link. These snapshots are captured from the game canvas, which can include the live camera view during webcam play.
+
+## Configuration
+
+Game tuning values such as round duration, scoring, and detection thresholds are source constants under `lib/games/`; there is no settings panel for changing them.
+
+| Setting | Default or behavior |
+| --- | --- |
+| Camera capture | Front-facing video; 1280×720 ideal dimensions; audio disabled. |
+| Hand tracker | Up to 4 hands; attempts GPU, then CPU. |
+| Pose tracker | Up to 2 poses; full model with lite-model fallback; attempts GPU, then CPU. |
+| Face tracker | Up to 2 faces; attempts GPU, then CPU. |
+| Score storage | Browser `localStorage`, separate key per game; up to 8 saved entries. |
+| `DISABLE_HMR` | Set to `true` in development to disable file watching, as used by the AI Studio environment. Restart the dev server after code changes when this is enabled. |
+
+`.env.example` lists `GEMINI_API_KEY` and `APP_URL` as AI Studio host-injected values. The game source does not read either variable, so neither is required for local play. There are no game-specific public environment variables.
+
+## Roadmap
+
+Ideas for future work, not committed delivery dates:
+
+- Add a retry path for model-load failures and keep the fallback controls visible when a tracker fails after camera permission succeeds.
+- Align the camera preview, landmark projection, and game input transforms across screen sizes.
+- Add continuous integration and browser smoke tests for permission and game-start flows.
+
+## Contributing
+
+Small fixes and game ideas can be proposed through a GitHub issue or pull request. For gameplay changes, keep deterministic rules in the relevant `lib/games/<game>/engine.ts` module and add or update its unit tests. Run the checks below before submitting a change.
+
+### Validation
+
+```bash
+bun test
+bun run lint
+bun run build
+```
+
+The repository includes Node.js `node:test` unit tests for game engines and scoreboard logic. `bun test` runs those suites. The build configuration skips ESLint, so run `bun run lint` separately.
+
+## License
+
+This repository does not currently include a `LICENSE` file.
+
+## Acknowledgments
+
+- [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/guide) for browser-side hand, pose, and face landmark tracking.
+- [Next.js](https://nextjs.org/) and [React](https://react.dev/) for the web application framework and UI.
+- [Bun](https://bun.sh/) for the package manager and test runner.
