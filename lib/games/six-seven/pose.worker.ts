@@ -34,7 +34,11 @@ worker.onmessage = async ({ data }) => {
     if (!model) throw new Error('Pose model is unavailable.');
     worker.postMessage({ type: 'pose', pose: readSixSevenPose(model, data.frame, data.atMs) });
   } catch (error) {
-    reportFailure(error);
+    if (typeof VideoFrame === 'function' && data.frame instanceof VideoFrame) {
+      worker.postMessage({ type: 'retry-bitmap' });
+    } else {
+      reportFailure(error);
+    }
   } finally {
     data.frame.close();
   }

@@ -46,7 +46,7 @@ The 1v1 mode is local split-screen play; it does not use online matchmaking. Pla
 - **Rhythm Dodge** — lean and duck to avoid lasers on a 128 BPM beat. 60-second rounds.
 - **Sorcerer's Duel** — cast Lightning, Reflect Shield, and Arcane Fist spells with hand gestures. Play solo against the Arcane Bot or in a 1v1 duel. 60-second rounds.
 - **Neon Muncher** — open your mouth to catch snacks and close it to deflect bombs. A triggered Shame Cam moment can produce a downloadable snapshot in the end card.
-- **Six Seven** — alternate anatomical left-wrist-up/right-wrist-down (6) and right-wrist-up/left-wrist-down (7) poses for points in a 30-second solo run. Webcam scores use a browser-local scoreboard; keyboard and touch practice scores stay separate and are not saved.
+- **Six Seven** — pump either wrist for a point on every lift as the numbers alternate 6 and 7 in a 30-second solo run. Webcam scores use a browser-local scoreboard; keyboard and touch practice scores stay separate and are not saved.
 - **Solo and 1v1 modes** with editable player names. Names are trimmed and limited to 18 characters.
 - **Browser-local scoreboards** retain up to eight entries per game; the end screen displays the top five and can clear that game's scores.
 - **Camera-free controls** include pointer input, keyboard input, or on-screen buttons depending on the game. Denying camera permission or playing without a webcam leaves these practice controls available.
@@ -138,15 +138,15 @@ The arcade hub links to each game. Most game pages let you choose Solo or 1v1 an
 
 ### Six Seven
 
-Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until both wrists are marked. Start with your hands level during the three-second countdown. Lift your left wrist while lowering your right for **6**, then reverse the motion for **7**. Each correct switch earns one point in a 30-second solo round. Completed camera rounds appear on the scoreboard in that browser.
+Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until at least one wrist is marked. After the countdown, lift either wrist to earn **+1**, lower it to reset, and lift again. You can repeat with the same wrist or alternate hands. The pop numbers alternate **6** and **7** in every 30-second solo round. Completed camera rounds appear on the scoreboard in that browser.
 
 Turn on **Save my camera runs** before starting a camera round to capture the game view with your camera, wrist markers, hit effects, and score. Open **Clips** to watch, scrub, download, or delete your recent recordings. Six Seven keeps up to five completed clips in this browser and requests no microphone access. Clip recording uses browser media APIs and is optional.
 
-Choose **Practice** to use the on-screen buttons or a keyboard. `A` or `←` raises the left arm for 6, while `D` or `→` raises the right arm for 7. Practice scores appear on the result screen for that round.
+Choose **Practice** to use the on-screen buttons or a keyboard. Press `A`, `D`, `←` or `→`, or tap either pad. Each discrete press or tap earns one point. Practice scores appear on the result screen for that round.
 
 ### Camera and fallback controls
 
-The app requests a front-facing camera with 1280×720 as the ideal resolution and no audio. Tracking runs against the browser's video stream. Hand tracking supports up to four hands; pose and face trackers each support up to two people. The shared game trackers try GPU inference first and fall back to CPU. The shared pose tracker also falls back from the full model to the lite model. Six Seven uses a dedicated one-person Pose Lite tracker. It processes fresh video frames in a worker when supported and can fall back to the main thread.
+The app requests a front-facing camera with 1280×720 as the ideal resolution and no audio. Tracking runs against the browser's video stream. Hand tracking supports up to four hands; pose and face trackers each support up to two people. The shared game trackers try GPU inference first and fall back to CPU. The shared pose tracker also falls back from the full model to the lite model. Six Seven uses a dedicated one-person Pose Lite tracker. It processes fresh video frames in a worker when supported, using direct frame transfer where available. The tracker falls back to bitmap sampling or the main thread as needed.
 
 If camera permission is denied or no webcam is available, each game exposes a fallback. The available fallback inputs are:
 
@@ -157,7 +157,7 @@ If camera permission is denied or no webcam is available, each game exposes a fa
 | Rhythm Dodge | Player 1: `A`/`D` to move and `S` to duck (arrow keys also work). Player 2: `J`/`L` to move and `K` to duck. On-screen buttons control Player 1. |
 | Sorcerer's Duel | Player 1: `1`/`2`/`3` or `Q`/`W`/`E`; Player 2: `7`/`8`/`9`. On-screen buttons control Player 1. |
 | Neon Muncher | Player 1: `A`/`D` to move, `W` or `Space` to open, and `Q`/`E` to tilt. Player 2: left/right/up arrows. On-screen buttons control Player 1. |
-| Six Seven | Practice: `A`/`←` for 6 and `D`/`→` for 7, or use the on-screen arm buttons. |
+| Six Seven | Practice: `A`, `D`, `←`, `→`, or either on-screen pad earns one point per press. |
 
 ### Round controls
 

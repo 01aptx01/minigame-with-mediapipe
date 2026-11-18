@@ -163,7 +163,7 @@ export function SixSevenInterface({
   };
   const closeClips = () => setClipsOpen(false);
   const startLabel = 'Start ' + roundSeconds + 's ' + (inputMode === 'camera' ? 'camera' : 'practice') + ' run';
-  const trackingText = trackingMessage || 'Follow the lit number and switch arms on every hit.';
+  const trackingText = trackingMessage || 'Pump either wrist to score.';
   const clipLibraryLabel = clips.length > 0 ? 'Clips (' + clips.length + ')' : 'Clips';
 
   return (
@@ -216,8 +216,8 @@ export function SixSevenInterface({
                 <div className={styles.mobileHud} role="group" aria-label="Round score and time">
                   <div><small>TIME</small><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
                   <span className={styles.mobileHudDivider} />
-                  <div><small>HITS</small><strong>{score}</strong></div>
-                  <span className={styles.mobileHudNext} data-next={nextNumber}><small>NEXT</small><strong>{nextNumber}</strong></span>
+                  <div><small>HITS</small><strong key={score} className={score > 0 ? styles.popScore : undefined}>{score}</strong></div>
+                  <span className={styles.mobileHudNext} data-next={nextNumber}><small>NEXT POP</small><strong>{nextNumber}</strong></span>
                 </div>
               )}
               <div className={styles.canvasViewport}>
@@ -230,25 +230,22 @@ export function SixSevenInterface({
                   <div className={styles.stageGuide} aria-label="Six Seven movement guide">
                     <div className={styles.guideMove} data-next="6">
                       <strong>6</strong>
-                      <span><small>LEFT</small><b>↑</b></span>
-                      <span><small>RIGHT</small><b>↓</b></span>
+                      <span><small>LIFT</small><b>↑</b></span>
                     </div>
                     <span className={styles.guideSwitch} aria-hidden="true">↔</span>
                     <div className={styles.guideMove} data-next="7">
                       <strong>7</strong>
-                      <span><small>LEFT</small><b>↓</b></span>
-                      <span><small>RIGHT</small><b>↑</b></span>
+                      <span><small>LIFT</small><b>↑</b></span>
                     </div>
-                    <p>{inputMode === 'practice' ? 'A / ← for 6 · D / → for 7' : 'Keep both wrists in frame'}</p>
+                    <p>{inputMode === 'practice' ? 'Tap either side for +1' : 'Lift for +1. Lower that wrist and lift again.'}</p>
                   </div>
                 )}
                 {phase === 'playing' && countdown === null && (
-                  <div className={styles.stageCue} data-next={nextNumber} aria-live="polite">
+                  <div className={styles.stageCue} data-next={nextNumber}>
                     <span>{nextNumber}</span>
                     <div>
-                      <small>{inputMode === 'practice' ? 'YOUR MOVE' : 'NEXT MOVE'}</small>
-                      <strong>{nextNumber === 6 ? 'LEFT UP · RIGHT DOWN' : 'RIGHT UP · LEFT DOWN'}</strong>
-                      {inputMode === 'practice' && <em>{nextNumber === 6 ? 'A / ←' : 'D / →'}</em>}
+                      <small>NEXT POP</small>
+                      <strong>{inputMode === 'practice' ? 'TAP EITHER SIDE' : 'LIFT EITHER WRIST'}</strong>
                     </div>
                   </div>
                 )}
@@ -287,17 +284,17 @@ export function SixSevenInterface({
               </div>
               <div className={styles.stageFooter}>
                 <span className={styles.stageFooterStatus}><span className={styles.smallStatusDot} data-state={tracking} />{phase === 'playing' ? trackingText : phase === 'paused' ? 'Round paused' : phase === 'gameover' ? (inputMode === 'practice' ? 'Practice score · not submitted' : 'Camera round complete') : inputMode === 'camera' ? (cameraReady ? 'Camera preview is live' : 'Camera preview appears after setup') : 'Practice controls appear after start'}</span>
-                <span className={styles.keyHint}>{phase === 'playing' && inputMode === 'practice' ? 'A / ←   D / →' : '6 LEFT   ·   7 RIGHT'}</span>
+                <span className={styles.keyHint}>{phase === 'playing' && inputMode === 'practice' ? 'A / ←   D / →' : '+1 PER POP'}</span>
               </div>
             </div>
 
             {phase === 'playing' && inputMode === 'practice' && countdown === null && (
               <div className={styles.practiceControls} role="group" aria-label="Practice arm controls">
-                <button type="button" className={styles.practiceButton + (nextNumber === 6 ? ' ' + styles.leftActive : '')} onClick={() => onPractice('left')}>
-                  <ArrowLeft size={17} aria-hidden="true" /><span><strong>Raise left</strong><small>A / ← · next 6</small></span>
+                <button type="button" className={styles.practiceButton + ' ' + styles.leftPad} onClick={() => onPractice('left')}>
+                  <ArrowLeft size={17} aria-hidden="true" /><span><strong>Tap left</strong><small>A / ←</small></span>
                 </button>
-                <button type="button" className={styles.practiceButton + (nextNumber === 7 ? ' ' + styles.rightActive : '')} onClick={() => onPractice('right')}>
-                  <span><strong>Raise right</strong><small>D / → · next 7</small></span><ArrowRight size={17} aria-hidden="true" />
+                <button type="button" className={styles.practiceButton + ' ' + styles.rightPad} onClick={() => onPractice('right')}>
+                  <span><strong>Tap right</strong><small>D / →</small></span><ArrowRight size={17} aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -321,20 +318,20 @@ export function SixSevenInterface({
                   <div className={styles.cameraSetup}>
                     <div className={styles.cameraSetupTitle}>
                       <span className={styles.cameraStatusGlyph} data-ready={cameraCanStart ? 'true' : 'false'}>{cameraCanStart ? <Check size={15} /> : <Camera size={15} />}</span>
-                      <div><strong>{cameraCanStart ? 'Camera is ready' : cameraBusy ? 'Warming up camera' : cameraReady ? 'Find your hands' : 'Enable your camera'}</strong><small>{cameraCanStart ? 'Stand back so both wrists fit in frame.' : cameraReady ? 'Raise both wrists into the frame to lock on.' : 'Your camera stays local to this device.'}</small></div>
+                      <div><strong>{cameraCanStart ? 'Camera is ready' : cameraBusy ? 'Warming up camera' : cameraReady ? 'Find your hands' : 'Enable your camera'}</strong><small>{cameraCanStart ? 'Lift either wrist for +1. Lower it to pop again.' : cameraReady ? 'Keep your shoulders and a wrist visible.' : 'Your camera stays local to this device.'}</small></div>
                     </div>
                     {!cameraReady && (
                       <button type="button" className={styles.cameraButton} disabled={cameraBusy} onClick={() => void onCameraSetup()}>
                         <Camera size={15} aria-hidden="true" />{cameraBusy ? 'Connecting…' : 'Enable camera'}
                       </button>
                     )}
-                    {cameraReady && tracking !== 'ready' && <div className={styles.trackingTip} role="status">{tracking === 'looking' ? 'Hold both hands level to calibrate.' : tracking === 'lost' ? 'Move back into view, then level both hands.' : 'Keep both shoulders and wrists visible.'}</div>}
+                    {cameraReady && tracking !== 'ready' && <div className={styles.trackingTip} role="status">{tracking === 'lost' ? 'Move your shoulders and a wrist back into view.' : 'Step back until the camera marks a wrist.'}</div>}
                     {cameraError && <p className={styles.errorText}>{cameraError}</p>}
                   </div>
                 ) : (
                   <div className={styles.practiceSetup}>
                     <Gamepad2 size={17} aria-hidden="true" />
-                    <p>Use <kbd>A</kbd> or <kbd>←</kbd> for 6, then <kbd>D</kbd> or <kbd>→</kbd> for 7. Tap the arm pads once the round starts.</p>
+                    <p>Tap either pad or press <kbd>A</kbd>, <kbd>D</kbd>, <kbd>←</kbd> or <kbd>→</kbd>. Every tap is +1.</p>
                   </div>
                 )}
 
@@ -360,10 +357,10 @@ export function SixSevenInterface({
               <section className={styles.liveCard} aria-label="Live game score">
                 <div className={styles.liveCardHeader}><span>{phase === 'gameover' ? 'FINAL READOUT' : phase === 'paused' ? 'ROUND ON HOLD' : 'ROUND IN PROGRESS'}</span></div>
                 <div className={styles.timerRow}><span>TIME LEFT</span><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
-                <div className={styles.scoreRow}><span>YOUR SCORE</span><strong>{score}<small>HITS</small></strong></div>
+                <div className={styles.scoreRow}><span>YOUR SCORE</span><strong key={score} className={score > 0 ? styles.popScore : undefined}>{score}<small>HITS</small></strong></div>
                 <div className={styles.nextMove} data-next={nextNumber}>
-                  <div className={styles.nextMoveTop}><span>NEXT MOVE</span><strong>{nextNumber}</strong></div>
-                  <p>{nextNumber === 6 ? 'Raise left · lower right' : 'Raise right · lower left'}</p>
+                  <div className={styles.nextMoveTop}><span>NEXT POP</span><strong>{nextNumber}</strong></div>
+                  <p>{inputMode === 'camera' ? 'Each lift earns +1. Lower to reset.' : 'Either side earns +1.'}</p>
                 </div>
                 <div className={styles.liveStatus}><span className={styles.smallStatusDot} data-state={tracking} /><p>{trackingText}</p></div>
                 {recording && <div className={styles.recordingNotice}><span className={styles.recordingDot} /> Saving this camera run privately</div>}

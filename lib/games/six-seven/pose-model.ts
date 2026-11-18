@@ -3,11 +3,12 @@ import type { SixSevenLandmark } from './engine';
 
 export type PoseWorkerRequest =
   | { type: 'initialize'; origin: string }
-  | { type: 'frame'; frame: ImageBitmap; atMs: number };
+  | { type: 'frame'; frame: ImageBitmap | VideoFrame; atMs: number };
 
 export type PoseWorkerResponse =
   | { type: 'ready' }
   | { type: 'pose'; pose: SixSevenLandmark[] | null }
+  | { type: 'retry-bitmap' }
   | { type: 'failed'; message: string };
 
 export async function createSoloPoseModel(origin: string): Promise<PoseLandmarker> {
@@ -34,7 +35,7 @@ export async function createSoloPoseModel(origin: string): Promise<PoseLandmarke
 
 export function readSixSevenPose(
   model: PoseLandmarker,
-  source: HTMLVideoElement | ImageBitmap,
+  source: HTMLVideoElement | ImageBitmap | VideoFrame,
   atMs: number
 ): SixSevenLandmark[] | null {
   const pose = model.detectForVideo(source, atMs).landmarks[0];
