@@ -389,7 +389,9 @@ export function MediaPipeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hasAutoInitializedRef.current) {
       hasAutoInitializedRef.current = true;
-      void requestCamera();
+      if (new URLSearchParams(window.location.search).get('game') !== 'six-seven') {
+        void requestCamera();
+      }
     }
 
     return () => {
