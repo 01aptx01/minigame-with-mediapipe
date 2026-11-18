@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createSixSevenState,
+  isSixSevenPoseVisible,
   registerSixSevenPracticeHit,
   resetSixSevenTracking,
   updateSixSevenGesture,
@@ -22,6 +23,23 @@ function makePose(
   const leftHigh = side === 'left';
   pose[15] = { x: 0.67, y: leftHigh ? 0.36 : 0.44, visibility: 1, ...overrides[15] };
   pose[16] = { x: 0.33, y: leftHigh ? 0.44 : 0.36, visibility: 1, ...overrides[16] };
+  return pose;
+}
+
+function poseBetween(
+  fromSide: SixSevenSide,
+  toSide: SixSevenSide,
+  progress: number
+): SixSevenLandmark[] {
+  const from = makePose(fromSide);
+  const to = makePose(toSide);
+  const pose = makePose(fromSide);
+  for (const index of [15, 16] as const) {
+    pose[index] = {
+      ...pose[index],
+      y: from[index].y + (to[index].y - from[index].y) * progress,
+    };
+  }
   return pose;
 }
 
@@ -104,6 +122,31 @@ test('starting on the right side still makes the first successful hit left/6', (
   assert.equal(state.score, 1);
 });
 
+test('countdown tracking records anchors without scoring, then GO scores the first expected swing', () => {
+  const state = createSixSevenState();
+
+  for (let i = 0; i < 5; i++) {
+    updateSixSevenGesture(state, makePose('right'), i * 33, false);
+  }
+  for (let i = 0; i < 8; i++) {
+    updateSixSevenGesture(state, makePose('left'), 165 + i * 33, false);
+  }
+  for (let i = 0; i < 8; i++) {
+    updateSixSevenGesture(state, makePose('right'), 429 + i * 33, false);
+  }
+
+  assert.equal(state.score, 0, 'countdown movements must not increase the score');
+  assert.equal(state.nextNumber, 6, 'countdown movements must not consume the opening 6');
+
+  const firstAfterGo = moveToSide(state, 'left', 700);
+  assert.equal(firstAfterGo.length, 1);
+  assert.deepEqual(
+    { number: firstAfterGo[0].number, side: firstAfterGo[0].side },
+    { number: 6, side: 'left' }
+  );
+  assert.equal(state.score, 1);
+});
+
 test('a settled level start can score the first left/up seesaw movement', () => {
   const state = createSixSevenState();
   holdNeutral(state, 0);
@@ -140,15 +183,110 @@ test('a brief opposite-side pose that does not survive debounce is ignored', () 
   const state = createSixSevenState();
   holdSide(state, 'right', 0);
 
-  for (let i = 0; i < 5; i++) {
-    updateSixSevenGesture(state, makePose('left'), 200 + i * 33);
-  }
-  for (let i = 0; i < 8; i++) {
-    updateSixSevenGesture(state, makePose('right'), 400 + i * 33);
-  }
+  // A two-frame flick crosses into the opposite lane briefly, then settles
+  // back on the source side before the 30 ms confirmation interval completes.
+  updateSixSevenGesture(state, makePose('left'), 165);
+  updateSixSevenGesture(state, makePose('left'), 198);
+  for (let i = 0; i < 8; i++) updateSixSevenGesture(state, makePose('right'), 231 + i * 33);
 
   assert.equal(state.score, 0);
   assert.equal(state.nextNumber, 6);
+});
+
+test('pose readiness uses the same landmark and shoulder validation as scoring', () => {
+  assert.equal(isSixSevenPoseVisible(makePose('left')), true);
+  assert.equal(isSixSevenPoseVisible(null), false);
+  assert.equal(isSixSevenPoseVisible(undefined), false);
+  assert.equal(isSixSevenPoseVisible(makePose('left').slice(0, 16)), false);
+
+  const lowConfidence = makePose('left');
+  lowConfidence[16] = { ...lowConfidence[16], visibility: 0.2 };
+  assert.equal(isSixSevenPoseVisible(lowConfidence), false);
+
+  const narrowShoulders = makePose('left');
+  narrowShoulders[12] = { ...narrowShoulders[12], x: 0.44 };
+  assert.equal(isSixSevenPoseVisible(narrowShoulders), false);
+});
+
+test('timestamp-adaptive filtering scores a realistic seesaw sweep within 200 ms at 24, 30, and 60 fps', () => {
+  const measuredLatencies: Record<number, number> = {};
+
+  for (const fps of [24, 30, 60]) {
+    const state = createSixSevenState();
+    const frameMs = 1_000 / fps;
+    const startMs = 1_000;
+    const baselineFrames = 4;
+    for (let frame = 0; frame < baselineFrames; frame++) {
+      updateSixSevenGesture(state, makePose('right'), startMs + frame * frameMs);
+    }
+
+    const motionStartMs = startMs + baselineFrames * frameMs;
+    let hit: ReturnType<typeof updateSixSevenGesture> = null;
+    // The arms move in opposite directions over 120 ms, then stay at the
+    // target endpoint while the detector confirms that the change is real.
+    for (let frame = 0; frame <= fps; frame++) {
+      const elapsedMs = frame * frameMs;
+      const progress = Math.min(1, elapsedMs / 120);
+      hit = updateSixSevenGesture(
+        state,
+        poseBetween('right', 'left', progress),
+        motionStartMs + elapsedMs
+      );
+      if (hit) break;
+    }
+
+    assert.ok(hit, `${fps} fps sweep should produce its opening 6`);
+    assert.equal(hit.number, 6);
+    assert.equal(hit.side, 'left');
+    measuredLatencies[fps] = hit.atMs - motionStartMs;
+    assert.ok(
+      measuredLatencies[fps] <= 200,
+      `${fps} fps hit latency was ${measuredLatencies[fps]} ms`
+    );
+  }
+
+  assert.deepEqual(Object.keys(measuredLatencies).sort(), ['24', '30', '60']);
+});
+
+test('fast alternating seesaw sweeps score without a neutral pose at all common frame rates', () => {
+  for (const fps of [24, 30, 60]) {
+    const state = createSixSevenState();
+    const frameMs = 1_000 / fps;
+    const motionStartMs = 4 * frameMs;
+    const halfCycleMs = 180;
+    const movementMs = 80;
+    const hits: NonNullable<ReturnType<typeof updateSixSevenGesture>>[] = [];
+
+    for (let frame = 0; frame < 4; frame++) {
+      updateSixSevenGesture(state, makePose('right'), frame * frameMs);
+    }
+
+    for (let frame = 4; frame * frameMs - motionStartMs <= 1_080; frame++) {
+      const nowMs = frame * frameMs;
+      const elapsedMs = nowMs - motionStartMs;
+      const cycle = Math.floor(elapsedMs / halfCycleMs);
+      const fromSide: SixSevenSide = cycle % 2 === 0 ? 'right' : 'left';
+      const toSide: SixSevenSide = fromSide === 'right' ? 'left' : 'right';
+      const phaseMs = elapsedMs % halfCycleMs;
+      const progress = Math.min(1, phaseMs / movementMs);
+      const hit = updateSixSevenGesture(
+        state,
+        poseBetween(fromSide, toSide, progress),
+        nowMs
+      );
+      if (hit) hits.push(hit);
+    }
+
+    assert.ok(hits.length >= 4, `${fps} fps scored only ${hits.length} rapid hits`);
+    for (let index = 0; index < hits.length; index++) {
+      assert.equal(hits[index].side, index % 2 === 0 ? 'left' : 'right');
+      assert.equal(hits[index].number, index % 2 === 0 ? 6 : 7);
+    }
+    assert.ok(
+      hits.slice(1).every((hit, index) => hit.atMs - hits[index].atMs <= 250),
+      `${fps} fps rapid hit intervals should remain under 250 ms`
+    );
+  }
 });
 
 test('opposite-side endpoints without opposite wrist travel do not score', () => {
@@ -213,6 +351,24 @@ test('shoulder translation and body lean shared by both wrists are normalized aw
   }
 
   assert.equal(state.score, 0);
+});
+
+test('shoulder roll with wrists fixed to their shoulders does not count as a seesaw', () => {
+  const state = createSixSevenState();
+  holdNeutral(state, 0);
+
+  for (let i = 0; i < 8; i++) {
+    const roll = Math.min(0.04, i * 0.01);
+    const pose = makePose('left');
+    pose[11] = { x: 0.4, y: 0.4 - roll, visibility: 1 };
+    pose[12] = { x: 0.6, y: 0.4 + roll, visibility: 1 };
+    pose[15] = { x: 0.67, y: 0.4 - roll, visibility: 1 };
+    pose[16] = { x: 0.33, y: 0.4 + roll, visibility: 1 };
+    updateSixSevenGesture(state, pose, 200 + i * 33);
+  }
+
+  assert.equal(state.score, 0);
+  assert.equal(state.nextNumber, 6);
 });
 
 test('long detection gaps and explicit resets keep score while clearing motion history', () => {

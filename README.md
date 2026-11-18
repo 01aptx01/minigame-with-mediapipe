@@ -60,7 +60,7 @@ The screenshots were captured from the public demo using camera-free controls. T
 
 *The arcade hub links to all six games.*
 
-![Six Seven practice round showing the score at the top and floating 6 and 7 effects](docs/images/six-seven.jpg)
+![Six Seven practice round showing the timer, score, next move, and floating hit effects](docs/images/six-seven.jpg)
 
 *Two correct switches light up the 6 and 7 effects. The HUD shows the score and the next move.*
 
@@ -138,13 +138,15 @@ The arcade hub links to each game. Most game pages let you choose Solo or 1v1 an
 
 ### Six Seven
 
-Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and start once body tracking is ready. Face the camera with both shoulders and wrists visible and your hands level. Lift your left wrist while lowering your right for **6**, then reverse the motion for **7**. Each correct switch earns one point in a 30-second solo round. Completed camera rounds appear on the Six Seven scoreboard in that browser.
+Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until both wrists are marked. Start with your hands level during the three-second countdown. Lift your left wrist while lowering your right for **6**, then reverse the motion for **7**. Each correct switch earns one point in a 30-second solo round. Completed camera rounds appear on the scoreboard in that browser.
+
+Turn on **Save my camera runs** before starting a camera round to capture the game view with your camera, wrist markers, hit effects, and score. Open **Clips** to watch, scrub, download, or delete your recent recordings. Six Seven keeps up to five completed clips in this browser and requests no microphone access. Clip recording uses browser media APIs and is optional.
 
 Choose **Practice** to use the on-screen buttons or a keyboard. `A` or `←` raises the left arm for 6, while `D` or `→` raises the right arm for 7. Practice scores appear on the result screen for that round.
 
 ### Camera and fallback controls
 
-The app requests a front-facing camera with 1280×720 as the ideal resolution and no audio. Tracking runs against the browser's video stream. Hand tracking supports up to four hands; pose and face trackers each support up to two people. The app tries GPU inference first and falls back to CPU; the pose tracker also falls back from the full model to the lite model if needed.
+The app requests a front-facing camera with 1280×720 as the ideal resolution and no audio. Tracking runs against the browser's video stream. Hand tracking supports up to four hands; pose and face trackers each support up to two people. The shared game trackers try GPU inference first and fall back to CPU. The shared pose tracker also falls back from the full model to the lite model. Six Seven uses a dedicated one-person Pose Lite tracker. It processes fresh video frames in a worker when supported and can fall back to the main thread.
 
 If camera permission is denied or no webcam is available, each game exposes a fallback. The available fallback inputs are:
 
