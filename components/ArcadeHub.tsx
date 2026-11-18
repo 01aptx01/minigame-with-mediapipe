@@ -6,6 +6,8 @@ import { CameraHelp } from '@/components/arcade/CameraHelp';
 import { motion } from 'motion/react';
 import {
   Camera,
+  Hand,
+  Keyboard,
   Play,
   Smile,
   Sparkles,
@@ -284,11 +286,11 @@ export default function ArcadeHub() {
               Arcade Lineup
             </h2>
             <span className="text-xs font-mono text-slate-400 whitespace-nowrap">
-              5 Playable · Ready to Party
+              6 Playable · Ready to Party
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3.5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="mt-4 grid gap-3.5 md:grid-cols-2 lg:grid-cols-3">
             {/* Playable Card 1: Neon Slash Duel */}
             <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-cyan-500/40 bg-[#0E131E] transition-colors hover:border-cyan-400">
               <div>
@@ -492,6 +494,51 @@ export default function ArcadeHub() {
                 >
                   <Smile className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Play Neon Muncher</span>
+                </Link>
+              </div>
+            </article>
+
+            {/* Playable Card 6: Six Seven */}
+            <article className="flex flex-col justify-between overflow-hidden rounded-xl border border-emerald-500/40 bg-[#0E131E] transition-colors hover:border-emerald-400">
+              <div>
+                <div className="relative h-28 w-full overflow-hidden border-b border-slate-800 bg-[#090D16]">
+                  <svg viewBox="0 0 360 180" className="h-full w-full" aria-hidden="true">
+                    <path d="M90 128 V50 M270 50 V128" stroke="rgba(148,163,184,0.35)" strokeWidth="3" strokeDasharray="6 6" />
+                    <path d="M77 66 L90 48 L103 66 M257 112 L270 130 L283 112" stroke="#34D399" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    <circle cx="90" cy="43" r="27" fill="rgba(52,211,153,0.15)" stroke="#34D399" strokeWidth="2.5" />
+                    <circle cx="270" cy="137" r="27" fill="rgba(52,211,153,0.15)" stroke="#34D399" strokeWidth="2.5" />
+                    <text x="90" y="52" fill="#D1FAE5" fontSize="25" fontWeight="800" textAnchor="middle">6</text>
+                    <text x="270" y="146" fill="#D1FAE5" fontSize="25" fontWeight="800" textAnchor="middle">7</text>
+                    <path d="M140 92 H220" stroke="#A78BFA" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M207 82 L220 92 L207 102" stroke="#A78BFA" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </svg>
+                </div>
+
+                <div className="p-4">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-slate-400">
+                    <span className="font-semibold text-emerald-300">Playable</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Solo</span>
+                    <span aria-hidden="true">·</span>
+                    <span>30s Alternating Moves</span>
+                  </div>
+                  <h3 className="mt-1.5 font-display text-lg font-bold text-white">
+                    Six Seven
+                  </h3>
+                  <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                    Alternate left wrist up/right wrist down for 6, then switch for 7. Play on webcam or practice with keys and touch.
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-4 pb-4">
+                <Link
+                  href="/?game=six-seven"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-400 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-emerald-300"
+                >
+                  <Hand className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Play Six Seven</span>
+                  <Keyboard className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </div>
             </article>
