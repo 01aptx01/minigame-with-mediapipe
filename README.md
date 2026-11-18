@@ -7,10 +7,8 @@
   ![MediaPipe Tasks Vision 1.2.3](https://img.shields.io/badge/MediaPipe%20Tasks%20Vision-1.2.3-4285F4?logo=google)
   ![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-informational)
 
-  [Docs](#getting-started) · [Demo](#screenshots) · [Report Bug](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Bug%20report) · [Request Feature](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Feature%20request)
+  [Docs](#getting-started) · [Demo](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/) · [Report Bug](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Bug%20report) · [Request Feature](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Feature%20request)
 </div>
-
-No public live demo is listed for this repository. The Demo link opens the screenshot gallery; use Quick Start to run the games locally.
 
 ## Table of Contents
 
@@ -55,6 +53,8 @@ The 1v1 mode is local split-screen play; it does not use online matchmaking. Pla
 
 ### Screenshots
 
+The screenshots were captured from the public demo using camera-free controls. The leaderboard includes three seeded sample entries and two actual demo game results.
+
 ![Arcade hub showing the five-game lineup](docs/images/arcade-hub.png)
 
 *The hub links to all five games.*
@@ -75,17 +75,17 @@ The 1v1 mode is local split-screen play; it does not use online matchmaking. Pla
 
 *Rhythm Dodge challenges players to move and duck around incoming lasers.*
 
-![Sorcerer's Duel arena with three colored spell types](docs/images/sorcerers-duel.png)
+![Sorcerer's Duel arena with Lightning Bolt selected and three on-screen spell buttons](docs/images/sorcerers-duel.png)
 
-*Sorcerer's Duel uses three hand-shaped spells in its arena.*
+*On-screen buttons provide camera-free controls for Lightning Bolt, Reflect Shield, and Arcane Fist. Webcam play can cast spells with hand gestures.*
 
 ![Neon Slash Duel title screen with 1v1 and Solo buttons, optional name fields, Enable Webcam, and Pointer Blade mode](docs/images/webcam-controls.png)
 
 *Choose a mode, add optional player names, and enable the webcam or play with pointer input.*
 
-![Arcade scoreboard with player names and scores](docs/images/leaderboard.png)
+![Neon Muncher result card with a browser-local scoreboard and example scores](docs/images/leaderboard.png)
 
-*End cards show the local scoreboard for that game.*
+*The example scores on this Neon Muncher result card illustrate the browser-local scoreboard.*
 
 ![Neon Muncher Shame Cam download card showing a game-canvas snapshot and Save Photo link](docs/images/shame-cam.png)
 
