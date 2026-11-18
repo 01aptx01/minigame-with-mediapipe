@@ -1,23 +1,20 @@
 import type { Metadata } from 'next';
-import { JetBrains_Mono, Outfit, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { MediaPipeProvider } from '@/contexts/MediaPipeContext';
 import './globals.css';
 
-const outfit = Outfit({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
+const outfit = localFont({
+  src: [{ path: '../public/fonts/outfit-600.ttf', weight: '600' }, { path: '../public/fonts/outfit-700.ttf', weight: '700' }, { path: '../public/fonts/outfit-800.ttf', weight: '800' }],
   variable: '--font-display',
 });
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const plusJakarta = localFont({
+  src: [{ path: '../public/fonts/plus-jakarta-sans-400.ttf', weight: '400' }, { path: '../public/fonts/plus-jakarta-sans-500.ttf', weight: '500' }, { path: '../public/fonts/plus-jakarta-sans-600.ttf', weight: '600' }, { path: '../public/fonts/plus-jakarta-sans-700.ttf', weight: '700' }],
   variable: '--font-sans',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['500', '700'],
+const jetbrainsMono = localFont({
+  src: [{ path: '../public/fonts/jetbrains-mono-500.ttf', weight: '500' }, { path: '../public/fonts/jetbrains-mono-700.ttf', weight: '700' }],
   variable: '--font-mono',
 });
 

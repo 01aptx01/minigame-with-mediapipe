@@ -100,39 +100,33 @@ The screenshots were captured from the public demo using camera-free controls. T
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) to install the dependencies from `bun.lock` and run the project scripts.
-- Node.js LTS to run the production standalone server.
+- Node.js 24 LTS and npm to install dependencies and build the app.
 - A modern browser with webcam support for MediaPipe tracking. Grant camera permission when prompted; the fallback controls work without a camera.
-- An internet connection on first use of each tracker so the MediaPipe task model can be downloaded. The WebAssembly runtime files are included in the repository.
+- The MediaPipe models and WebAssembly runtime files are included in the repository.
 
 ### Installation
 
 ```bash
 git clone https://github.com/01aptx01/minigame-with-mediapipe.git
 cd minigame-with-mediapipe
-bun install --frozen-lockfile
+npm ci
 ```
 
 ### Quick Start
 
 ```bash
-bun run dev
+npm run dev
 ```
 
-Open the local URL printed by Next.js (normally `http://localhost:3000`). Choose a game, click or tap Solo or 1v1, enter names if you like, and start a round. The app requests camera access when it loads; if you decline, use that game's fallback controls.
+Open the local URL printed by Next.js (normally `http://localhost:3000`). Choose a game, click or tap Solo or 1v1, enter names if you like, and start a round. Select **Enable Webcam** to grant camera access, or use the game's fallback controls.
 
-### Run a standalone build locally
-
-`next.config.ts` sets `output: 'standalone'`. The standalone directory needs the static assets and public files copied alongside it before launch:
+### Build for deployment
 
 ```bash
-bun run build
-cp -a public .next/standalone/
-cp -a .next/static .next/standalone/.next/
-HOSTNAME=127.0.0.1 PORT=3102 node .next/standalone/server.js
+npm run build
 ```
 
-Open `http://127.0.0.1:3102` to use the standalone build locally.
+Serve the generated `out/` directory with a static web server.
 
 On a deployed site, serve the app over HTTPS for camera access. If it is embedded in an iframe, the host page must grant that frame camera permission.
 
@@ -205,12 +199,12 @@ Small fixes and game ideas can be proposed through a GitHub issue or pull reques
 ### Validation
 
 ```bash
-bun test
-bun run lint
-bun run build
+npx --yes bun test
+npm run lint
+npm run build
 ```
 
-The repository includes Node.js `node:test` unit tests for game engines and scoreboard logic. `bun test` runs those suites. The build configuration skips ESLint, so run `bun run lint` separately.
+The repository includes Node.js `node:test` unit tests for game engines, camera access, and scoreboard logic. `npx --yes bun test` runs those suites. The build configuration skips ESLint, so run `npm run lint` separately.
 
 ## License
 
@@ -220,4 +214,4 @@ This repository does not currently include a `LICENSE` file.
 
 - [MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/guide) for browser-side hand, pose, and face landmark tracking.
 - [Next.js](https://nextjs.org/) and [React](https://react.dev/) for the web application framework and UI.
-- [Bun](https://bun.sh/) for the package manager and test runner.
+- [Bun](https://bun.sh/) for the test runner.
