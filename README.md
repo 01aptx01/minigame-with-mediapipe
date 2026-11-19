@@ -7,7 +7,9 @@
   ![MediaPipe Tasks Vision 1.2.3](https://img.shields.io/badge/MediaPipe%20Tasks%20Vision-1.2.3-4285F4?logo=google)
   ![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-informational)
 
-  [Docs](#getting-started) · [Demo](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/) · [Report Bug](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Bug%20report) · [Request Feature](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Feature%20request)
+  **[Play Webcam Party Arcade on ChatGPT Sites](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/)**
+
+  [Docs](#getting-started) · [Report Bug](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Bug%20report) · [Request Feature](https://github.com/01aptx01/minigame-with-mediapipe/issues/new?title=Feature%20request)
 </div>
 
 ## Table of Contents
