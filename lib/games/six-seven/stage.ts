@@ -91,8 +91,11 @@ export function drawSixSevenStage(
     const age = Math.max(0, nowMs - hit.atMs);
     if (age >= SIX_SEVEN_HIT_MS) continue;
     const t = age / SIX_SEVEN_HIT_MS;
+    // Pin the number to its mirrored screen lane so crossed arms never move
+    // a wrist's 6 or 7 into the other half of the stage.
+    const laneX = bounds.x + bounds.w * (hit.side === 'left' ? 0.27 : 0.73);
+    const x = Math.max(bounds.x + size / 2, Math.min(bounds.x + bounds.w - size / 2, laneX));
     const point = project(hit);
-    const x = Math.max(bounds.x + size / 2, Math.min(bounds.x + bounds.w - size / 2, point.x));
     const y = Math.max(bounds.y + size / 2, point.y - size * (0.55 + (reducedMotion ? 0 : t)));
     const color = colorFor(hit.number);
 

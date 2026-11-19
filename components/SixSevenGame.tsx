@@ -39,10 +39,10 @@ interface Round {
 }
 
 const TRACKING_MESSAGES: Record<Tracking, string> = {
-  off: 'Enable your camera to see your wrists on the stage.',
-  looking: 'Keep your shoulders and at least one wrist in view.',
-  ready: 'Lift and lower either wrist to keep popping.',
-  lost: 'Bring your shoulders and a wrist back into view.',
+  off: 'Enable your camera to track your wrists on the stage.',
+  looking: 'Bring a wrist into view to start tracking.',
+  ready: 'Lift a wrist to pop its lane, then lower it before the next pop.',
+  lost: 'Bring a wrist back into view to resume.',
 };
 
 function secondsRemaining(round: Round, nowMs: number) {
@@ -68,7 +68,7 @@ export default function SixSevenGame() {
   const [clipEnabled, setClipEnabled] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [remainingSec, setRemainingSec] = useState(ROUND_SECONDS);
-  const [hitDisplay, setHitDisplay] = useState<{ score: number; nextNumber: 6 | 7 }>({ score: 0, nextNumber: 6 });
+  const [hitDisplay, setHitDisplay] = useState({ score: 0 });
 
   const trackerRef = useRef<SixSevenPoseTracker | null>(null);
   const mountedRef = useRef(false);
@@ -152,9 +152,10 @@ export default function SixSevenGame() {
     changeTracking(mode === 'camera' && cameraReady ? 'looking' : 'off');
   }, [cameraReady, changeTracking, resetPose]);
 
-  const handleHit = useCallback((hit: SixSevenHit) => {
-    hitsRef.current.push(hit);
-    setHitDisplay({ score: gameRef.current.score, nextNumber: gameRef.current.nextNumber });
+  const handleHits = useCallback((hits: readonly SixSevenHit[]) => {
+    if (hits.length === 0) return;
+    hitsRef.current.push(...hits);
+    setHitDisplay({ score: gameRef.current.score });
     audioRef.current?.playSlice(gameRef.current.score);
   }, [audioRef]);
 
@@ -163,8 +164,8 @@ export default function SixSevenGame() {
     const nowMs = performance.now();
     if (phaseRef.current !== 'playing' || modeRef.current !== 'practice' ||
         !round || nowMs < round.startsAtMs || secondsRemaining(round, nowMs) <= 0) return;
-    handleHit(registerSixSevenPracticeHit(gameRef.current, side, nowMs));
-  }, [handleHit]);
+    handleHits([registerSixSevenPracticeHit(gameRef.current, side, nowMs)]);
+  }, [handleHits]);
 
   const startRound = useCallback(() => {
     if (modeRef.current === 'camera' && (!cameraReady || trackingRef.current !== 'ready')) return;
@@ -182,7 +183,7 @@ export default function SixSevenGame() {
       recordingStarted: false,
     };
     audioRef.current?.playCountdownTick();
-    setHitDisplay({ score: 0, nextNumber: 6 });
+    setHitDisplay({ score: 0 });
     setRemainingSec(ROUND_SECONDS);
     setCountdown(COUNTDOWN_MS / 1000);
     setNewEntryIds([]);
@@ -216,7 +217,7 @@ export default function SixSevenGame() {
     hitsRef.current = [];
     setCountdown(null);
     setRemainingSec(ROUND_SECONDS);
-    setHitDisplay({ score: 0, nextNumber: 6 });
+    setHitDisplay({ score: 0 });
     resetPose();
     changePhase('title');
   }, [changePhase, discardClip, resetPose]);
@@ -310,10 +311,8 @@ export default function SixSevenGame() {
         changeTracking('ready');
         const round = roundRef.current;
         if (phaseRef.current !== 'playing' || !round || secondsRemaining(round, receivedAtMs) <= 0) return;
-        const hit = updateSixSevenGesture(
-          gameRef.current, pose, nowMs, nowMs >= round.startsAtMs, video.videoWidth / video.videoHeight
-        );
-        if (hit) handleHit({ ...hit, atMs: receivedAtMs });
+        const hits = updateSixSevenGesture(gameRef.current, pose, nowMs, nowMs >= round.startsAtMs);
+        if (hits.length > 0) handleHits(hits.map((hit) => ({ ...hit, atMs: receivedAtMs })));
       }).catch(() => {
         if (cancelled || trackerRef.current !== tracker) return;
         tracker.close();
@@ -332,7 +331,7 @@ export default function SixSevenGame() {
       if (useVideoFrames) video.cancelVideoFrameCallback(frameId);
       else cancelAnimationFrame(frameId);
     };
-  }, [cameraReady, changeTracking, handleHit, initializePose, inputMode, resetPose, videoRef]);
+  }, [cameraReady, changeTracking, handleHits, initializePose, inputMode, resetPose, videoRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -453,7 +452,7 @@ export default function SixSevenGame() {
   }, [audioRef, cameraStatus, canvasRef, changePhase, changeTracking, finishClip, recordScoreboardRound, resetPose, sizeRef, startClip, togglePause, videoRef]);
 
   const trackingMessage = inputMode === 'practice'
-    ? 'Tap either button or press its key to pop.'
+    ? 'Tap left for 6 or right for 7, or press its key.'
     : TRACKING_MESSAGES[tracking];
 
   return (
@@ -469,7 +468,6 @@ export default function SixSevenGame() {
       trackingMessage={trackingMessage}
       countdown={countdown}
       score={hitDisplay.score}
-      nextNumber={hitDisplay.nextNumber}
       remainingSec={remainingSec}
       bestScore={scoreboard[0]?.score ?? 0}
       playerName={p1Name}

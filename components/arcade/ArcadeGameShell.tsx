@@ -231,7 +231,7 @@ export function ArcadeGameShell({
   }, [canvasRef, sizeRef]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#07090F] text-slate-100 select-none">
+    <div className="relative h-screen w-screen overflow-hidden bg-arcade-background text-arcade-text select-none">
       {/* Isolated Canvas Stage */}
       <div ref={stageRef} className="absolute inset-0">
         <canvas
@@ -338,6 +338,7 @@ export function ArcadeGameShell({
                 onToggleMute();
               }}
               aria-label={isMuted ? 'Unmute audio (M)' : 'Mute audio (M)'}
+              aria-pressed={isMuted}
               title="Mute / Unmute (M)"
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:h-9 sm:w-9"
             >
@@ -357,6 +358,7 @@ export function ArcadeGameShell({
                     onTogglePause();
                   }}
                   aria-label={phase === 'paused' ? 'Resume game (P)' : 'Pause game (P)'}
+                  aria-pressed={phase === 'paused'}
                   title="Pause / Resume (P)"
                   className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700/70 bg-[#0D121D]/90 text-slate-200 transition-colors hover:border-slate-500 hover:text-white sm:h-9 sm:w-9"
                 >
@@ -410,14 +412,14 @@ export function ArcadeGameShell({
 
       {/* Title Screen Overlay */}
       {phase === 'title' && titleOverlay && (
-        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-arcade-background/92 px-4 pt-28 pb-6 sm:pt-24">
           <div className="my-auto flex w-full justify-center">{titleOverlay}</div>
         </div>
       )}
 
       {/* Shared Pause Modal */}
       {phase === 'paused' && (
-        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-arcade-background/92 px-4 pt-28 pb-6 sm:pt-24">
           <div className="my-auto w-full max-w-sm rounded-2xl border border-slate-700 bg-[#0D121E] p-6 text-center shadow-2xl">
             <h2 className="font-display text-2xl font-bold text-white">Match Paused</h2>
             <p className="mt-1.5 text-sm text-slate-400">{pauseSubtitle}</p>
@@ -449,7 +451,7 @@ export function ArcadeGameShell({
 
       {/* End Game Overlay */}
       {phase === 'gameover' && endOverlay && (
-        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-[#07090F]/92 px-4 pt-28 pb-6 sm:pt-24">
+        <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-arcade-background/92 px-4 pt-28 pb-6 sm:pt-24">
           <div className="my-auto flex w-full justify-center">{endOverlay}</div>
         </div>
       )}

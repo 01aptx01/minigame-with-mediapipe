@@ -33,7 +33,7 @@ export function LeaderboardPanel({
             type="button"
             onClick={onClear}
             title="Clear scoreboard"
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition-colors hover:text-slate-300"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 transition-colors hover:text-white"
           >
             <Trash2 className="h-3 w-3" aria-hidden="true" />
             <span>Reset</span>
@@ -42,7 +42,7 @@ export function LeaderboardPanel({
       </div>
 
       {visible.length === 0 ? (
-        <p className="py-2 text-center text-xs text-slate-500">No scores recorded yet.</p>
+        <p className="py-2 text-center text-xs text-slate-400">No scores recorded yet.</p>
       ) : (
         <ul className="space-y-1.5">
           {visible.map((entry, idx) => {
@@ -65,7 +65,7 @@ export function LeaderboardPanel({
                         ? 'text-slate-200'
                         : idx === 2
                         ? 'text-amber-600'
-                        : 'text-slate-500'
+                        : 'text-slate-400'
                     }`}
                   >
                     #{idx + 1}

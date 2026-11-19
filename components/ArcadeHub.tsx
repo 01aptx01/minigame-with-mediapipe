@@ -205,9 +205,9 @@ export default function ArcadeHub() {
       : 'Pointer Mode Ready · Connect Webcam Anytime';
 
   return (
-    <div className="min-h-screen bg-[#07090F] text-slate-100">
+    <div className="min-h-screen bg-arcade-background text-arcade-text">
       {/* Minimal Top Bar */}
-      <header className="border-b border-slate-800/80 bg-[#07090F]/95">
+      <header className="border-b border-slate-800/80 bg-arcade-background/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-3.5">
           <Link
             href="/"
@@ -366,7 +366,7 @@ export default function ArcadeHub() {
               <div className="px-4 pb-4">
                 <Link
                   href="/?game=pose-match-battle"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-rose-400"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-rose-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-rose-400"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                   <span>Play Pose Match Battle</span>
@@ -447,7 +447,7 @@ export default function ArcadeHub() {
               <div className="px-4 pb-4">
                 <Link
                   href="/?game=sorcerers-duel"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-purple-400"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-purple-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-purple-400"
                 >
                   <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Play Sorcerer&apos;s Duel</span>
@@ -490,7 +490,7 @@ export default function ArcadeHub() {
               <div className="px-4 pb-4">
                 <Link
                   href="/?game=neon-muncher"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pink-500 px-3.5 py-2 text-xs font-bold text-white transition-colors hover:bg-pink-400"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-pink-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition-colors hover:bg-pink-400"
                 >
                   <Smile className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>Play Neon Muncher</span>
@@ -520,13 +520,13 @@ export default function ArcadeHub() {
                     <span aria-hidden="true">·</span>
                     <span>Solo</span>
                     <span aria-hidden="true">·</span>
-                    <span>30s Alternating Moves</span>
+                    <span>30s Wrist Challenge</span>
                   </div>
                   <h3 className="mt-1.5 font-display text-lg font-bold text-white">
                     Six Seven
                   </h3>
                   <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-                    Alternate left wrist up/right wrist down for 6, then switch for 7. Play on webcam or practice with keys and touch.
+                    Lift either wrist to score. The left wrist pops 6, and the right wrist pops 7. Play with a webcam or practice with keys and touch.
                   </p>
                 </div>
               </div>

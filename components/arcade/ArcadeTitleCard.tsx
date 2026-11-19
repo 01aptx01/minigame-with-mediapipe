@@ -71,6 +71,7 @@ export function ArcadeTitleCard({
           <button
             type="button"
             onClick={() => onModeChange('1v1')}
+            aria-pressed={mode === '1v1'}
             className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
               mode === '1v1'
                 ? 'bg-cyan-400 text-slate-950'
@@ -83,6 +84,7 @@ export function ArcadeTitleCard({
           <button
             type="button"
             onClick={() => onModeChange('solo')}
+            aria-pressed={mode === 'solo'}
             className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-xs font-bold transition-colors ${
               mode === 'solo'
                 ? 'bg-cyan-400 text-slate-950'

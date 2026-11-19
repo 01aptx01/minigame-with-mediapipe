@@ -34,7 +34,7 @@ export function PlayerNameInputs({
           onChange={(e) => onChangeP1Name(e.target.value)}
           placeholder={soloMode ? 'Solo Player' : 'Player 1'}
           data-testid="p1-name-input"
-          className="w-full rounded-lg border border-slate-700/80 bg-[#080C15] px-3 py-2 text-xs font-medium text-white placeholder:text-slate-500 focus:border-cyan-400 focus:outline-none"
+          className="w-full rounded-lg border border-slate-700/80 bg-[#080C15] px-3 py-2 text-xs font-medium text-white placeholder:text-slate-400 focus:border-cyan-400"
         />
       </label>
 
@@ -50,7 +50,7 @@ export function PlayerNameInputs({
             onChange={(e) => onChangeP2Name(e.target.value)}
             placeholder="Player 2"
             data-testid="p2-name-input"
-            className="w-full rounded-lg border border-slate-700/80 bg-[#080C15] px-3 py-2 text-xs font-medium text-white placeholder:text-slate-500 focus:border-rose-400 focus:outline-none"
+            className="w-full rounded-lg border border-slate-700/80 bg-[#080C15] px-3 py-2 text-xs font-medium text-white placeholder:text-slate-400 focus:border-rose-400"
           />
         </label>
       )}

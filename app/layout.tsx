@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${outfit.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}
     >
-      <body suppressHydrationWarning className="min-h-screen bg-[#07090F] text-slate-100">
+      <body suppressHydrationWarning className="min-h-screen">
         <MediaPipeProvider>{children}</MediaPipeProvider>
       </body>
     </html>

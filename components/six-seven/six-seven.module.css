@@ -1,11 +1,11 @@
 .interface {
-  --background: #07090f;
+  --background: var(--color-arcade-background);
   --recessed: #090d16;
   --surface: #0d121e;
   --surface-raised: #172033;
   --border: #334155;
   --line: #263247;
-  --text: #f1f5f9;
+  --text: var(--color-arcade-text);
   --muted: #a0aec0;
   --accent: #22d3ee;
   --six: #67e8f9;
@@ -112,7 +112,7 @@
   text-decoration: none;
   white-space: nowrap;
 }
-.hubLink:hover { border-color: var(--accent); background: var(--text); }
+.hubLink:hover { border-color: var(--accent); background: var(--surface-raised); }
 
 .headerActions { display: flex; align-items: center; gap: 9px; }
 .headerActions .secondaryButton { min-height: 39px; }
@@ -276,48 +276,55 @@
   font-size: 16px;
   font-weight: 950;
 }
-.guideMove[data-next="7"] > strong { background: var(--rose-tint); color: var(--seven); }
+.guideMove[data-lane="right"] > strong { background: var(--rose-tint); color: var(--seven); }
 .guideMove > span { display: grid; justify-items: center; gap: 2px; }
 .guideMove small { color: var(--muted); font-family: var(--font-mono, monospace); font-size: 8px; font-weight: 850; letter-spacing: .03em; white-space: nowrap; }
 .guideMove b { color: var(--six); font-family: var(--font-mono, monospace); font-size: 24px; font-weight: 950; line-height: .9; }
-.guideMove[data-next="7"] b { color: var(--seven); }
+.guideMove[data-lane="right"] b { color: var(--seven); }
 .guideSwitch { color: var(--accent); font-family: var(--font-mono, monospace); font-size: 17px; font-weight: 900; text-align: center; }
 .stageGuide p { grid-column: 1 / -1; margin: 2px 0 0; color: var(--text); font-family: var(--font-mono, monospace); font-size: 9px; font-weight: 750; letter-spacing: .04em; text-align: center; }
 
-.stageCue {
+.stageLanes {
   position: absolute;
   z-index: 3;
-  top: 49px;
-  left: 50%;
+  inset: 49px 13px auto;
   display: flex;
-  align-items: center;
-  gap: 9px;
-  transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, .2);
-  border-radius: 12px;
-  background: rgba(9, 13, 22, .88);
-  padding: 7px 12px 7px 8px;
-  color: var(--text);
-  white-space: nowrap;
+  justify-content: space-between;
   pointer-events: none;
+}
+.stageLanes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 35px;
+  border: 1px solid rgba(103, 232, 249, .4);
+  border-radius: 10px;
+  background: rgba(9, 13, 22, .84);
+  padding: 4px 9px 4px 5px;
+  color: var(--text);
   backdrop-filter: blur(7px);
 }
-.stageCue > span {
+.stageLanes > span[data-lane="right"] { flex-direction: row-reverse; border-color: rgba(253, 164, 175, .45); padding: 4px 5px 4px 9px; }
+.stageLanes strong {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 7px;
   background: var(--six);
   color: var(--on-accent);
   font-family: var(--font-mono, monospace);
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 950;
 }
-.stageCue[data-next="7"] > span { background: var(--seven); }
-.stageCue > div { display: grid; gap: 3px; }
-.stageCue small { color: var(--accent); font-family: var(--font-mono, monospace); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
-.stageCue strong { font-family: var(--font-mono, monospace); font-size: 9px; font-weight: 900; letter-spacing: .03em; }
+.stageLanes > span[data-lane="right"] strong { background: var(--seven); color: var(--background); }
+.stageLanes small {
+  color: var(--muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
 
 .countdownLayer,
 .phaseOverlay {
@@ -679,7 +686,7 @@
 .secondaryButton {
   min-height: 40px;
   border: 1px solid var(--border);
-  background: var(--text);
+  background: var(--surface);
   padding: 7px 11px;
   color: var(--text);
   font-size: 10px;
@@ -716,14 +723,15 @@
   45% { color: var(--six); transform: scale(1.15); }
 }
 .scoreRow strong small { color: var(--muted); font-size: 8px; letter-spacing: .13em; }
-.nextMove { margin-top: 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-raised); padding: 12px; }
-.nextMove[data-next="6"] { border-color: rgba(34, 211, 238, .36); }
-.nextMove[data-next="7"] { border-color: rgba(251, 113, 133, .4); }
-.nextMoveTop { display: flex; align-items: center; justify-content: space-between; }
-.nextMoveTop span { color: var(--muted); font-family: var(--font-mono, monospace); font-size: 8px; font-weight: 850; letter-spacing: .12em; }
-.nextMoveTop strong { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 9px; background: var(--accent-tint); color: var(--six); font-family: var(--font-mono, monospace); font-size: 17px; font-weight: 950; }
-.nextMove[data-next="7"] .nextMoveTop strong { background: var(--rose-tint); color: var(--seven); }
-.nextMove p { margin: 8px 0 11px; color: var(--text); font-size: 11px; font-weight: 750; }
+.laneLegend { margin-top: 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-raised); padding: 12px; }
+.laneLegendHeading { color: var(--muted); font-family: var(--font-mono, monospace); font-size: 8px; font-weight: 850; letter-spacing: .12em; }
+.laneLegendRows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.laneLegendRows > span { display: flex; align-items: center; gap: 8px; min-height: 39px; border: 1px solid rgba(103, 232, 249, .35); border-radius: 8px; background: rgba(9, 13, 22, .4); padding: 5px 8px; }
+.laneLegendRows > span[data-lane="right"] { border-color: rgba(253, 164, 175, .4); }
+.laneLegendRows strong { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 7px; background: var(--six); color: var(--on-accent); font-family: var(--font-mono, monospace); font-size: 16px; font-weight: 950; }
+.laneLegendRows > span[data-lane="right"] strong { background: var(--seven); color: var(--background); }
+.laneLegendRows small { color: var(--text); font-family: var(--font-mono, monospace); font-size: 8px; font-weight: 850; letter-spacing: .06em; }
+.laneLegend p { margin: 8px 0 0; color: var(--text); font-size: 10px; font-weight: 700; line-height: 1.4; }
 .liveStatus { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: var(--muted); }
 .liveStatus .smallStatusDot { margin-top: 4px; }
 .liveStatus p { margin: 0; font-size: 10px; line-height: 1.45; }
@@ -859,9 +867,11 @@
   .mobileHud strong { color: var(--text); font-family: var(--font-mono, monospace); font-size: 20px; font-weight: 950; line-height: 1; }
   .mobileHud > div:first-child strong[data-low="true"] { color: var(--seven); }
   .mobileHudDivider { width: 1px; height: 29px; background: rgba(255, 255, 255, .15); }
-  .mobileHudNext { display: grid; justify-items: end; gap: 1px; }
-  .mobileHudNext strong { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 7px; background: var(--six); color: var(--on-accent); font-size: 17px; }
-  .mobileHudNext[data-next="7"] strong { background: var(--seven); }
+  .mobileHudLanes { display: flex; align-items: center; gap: 7px; }
+  .mobileHudLanes > span { display: grid; justify-items: center; gap: 2px; }
+  .mobileHudLanes > span small { font-size: 7px; }
+  .mobileHudLanes strong { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 7px; background: var(--six); color: var(--on-accent); font-family: var(--font-mono, monospace); font-size: 15px; font-weight: 950; }
+  .mobileHudLanes > span[data-lane="right"] strong { background: var(--seven); color: var(--background); }
   .stageGuide { width: calc(100% - 20px); grid-template-columns: minmax(0, 1fr) 15px minmax(0, 1fr); gap: 5px; padding: 9px 7px; }
   .guideMove { grid-template-columns: auto auto; gap: 3px; }
   .guideMove > strong { width: 22px; height: 22px; font-size: 14px; }
@@ -872,9 +882,11 @@
   .stageFooter { min-height: 39px; padding: 7px 10px; }
   .stageFooterStatus { font-size: 9px; }
   .keyHint { font-size: 9px; }
-  .stageCue { top: 42px; gap: 7px; padding: 6px 9px 6px 6px; }
-  .stageCue > span { width: 29px; height: 29px; font-size: 17px; }
-  .stageCue strong { font-size: 8px; }
+  .stageLanes { inset: 42px 9px auto; }
+  .stageLanes > span { min-height: 32px; gap: 5px; padding-inline: 4px; }
+  .stageLanes > span[data-lane="right"] { padding-inline: 4px; }
+  .stageLanes strong { width: 24px; height: 24px; font-size: 14px; }
+  .stageLanes small { font-size: 7px; }
   .setupCard { padding: 17px; }
   .setupCard h2 { font-size: 28px; }
   .liveCard { padding: 16px; }
@@ -888,6 +900,7 @@
   .feedTag,
   .stageTag { min-height: 23px; padding: 4px 8px; font-size: 8px; }
   .canvasTopLine { inset: 9px 9px auto; }
+  .stageLanes { inset: 37px 9px auto; }
   .pauseButton { min-height: 38px; padding: 7px 9px; font-size: 10px; }
   .stageFooter { align-items: flex-start; }
   .stageFooterStatus > :last-child { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
