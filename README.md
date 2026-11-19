@@ -46,7 +46,7 @@ The 1v1 mode is local split-screen play; it does not use online matchmaking. Pla
 - **Rhythm Dodge** — lean and duck to avoid lasers on a 128 BPM beat. 60-second rounds.
 - **Sorcerer's Duel** — cast Lightning, Reflect Shield, and Arcane Fist spells with hand gestures. Play solo against the Arcane Bot or in a 1v1 duel. 60-second rounds.
 - **Neon Muncher** — open your mouth to catch snacks and close it to deflect bombs. A triggered Shame Cam moment can produce a downloadable snapshot in the end card.
-- **Six Seven** — pump either wrist for a point on every lift as the numbers alternate 6 and 7 in a 30-second solo run. Webcam scores use a browser-local scoreboard; keyboard and touch practice scores stay separate and are not saved.
+- **Six Seven** — pump either wrist for a point on every lift in a 30-second solo run. The left wrist pops **6** on the left, and the right wrist pops **7** on the right. Webcam scores use a browser-local scoreboard; keyboard and touch practice scores stay separate and are not saved.
 - **Solo and 1v1 modes** with editable player names. Names are trimmed and limited to 18 characters.
 - **Browser-local scoreboards** retain up to eight entries per game; the end screen displays the top five and can clear that game's scores.
 - **Camera-free controls** include pointer input, keyboard input, or on-screen buttons depending on the game. Denying camera permission or playing without a webcam leaves these practice controls available.
@@ -60,7 +60,7 @@ The screenshots were captured from the public demo using camera-free controls. T
 
 *The arcade hub links to all six games.*
 
-![Six Seven practice round showing the timer, score, next move, and floating hit effects](docs/images/six-seven.jpg)
+![Six Seven practice round showing the timer, score, and floating hit effects](docs/images/six-seven.jpg)
 
 *Two correct switches light up the 6 and 7 effects. The HUD shows the score and the next move.*
 
@@ -138,7 +138,7 @@ The arcade hub links to each game. Most game pages let you choose Solo or 1v1 an
 
 ### Six Seven
 
-Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until at least one wrist is marked. After the countdown, lift either wrist to earn **+1**, lower it to reset, and lift again. You can repeat with the same wrist or alternate hands. The pop numbers alternate **6** and **7** in every 30-second solo round. Completed camera rounds appear on the scoreboard in that browser.
+Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until at least one wrist is marked. After the countdown, lift either wrist to earn **+1**, then lower that wrist before lifting it again. The left wrist always pops **6** on the left side of the mirrored preview, and the right wrist always pops **7** on the right. Each wrist scores independently, so lifting both wrists can earn **+2**. Completed camera rounds appear on the scoreboard in that browser.
 
 Turn on **Save my camera runs** before starting a camera round to capture the game view with your camera, wrist markers, hit effects, and score. Open **Clips** to watch, scrub, download, or delete your recent recordings. Six Seven keeps up to five completed clips in this browser and requests no microphone access. Clip recording uses browser media APIs and is optional.
 
@@ -157,7 +157,7 @@ If camera permission is denied or no webcam is available, each game exposes a fa
 | Rhythm Dodge | Player 1: `A`/`D` to move and `S` to duck (arrow keys also work). Player 2: `J`/`L` to move and `K` to duck. On-screen buttons control Player 1. |
 | Sorcerer's Duel | Player 1: `1`/`2`/`3` or `Q`/`W`/`E`; Player 2: `7`/`8`/`9`. On-screen buttons control Player 1. |
 | Neon Muncher | Player 1: `A`/`D` to move, `W` or `Space` to open, and `Q`/`E` to tilt. Player 2: left/right/up arrows. On-screen buttons control Player 1. |
-| Six Seven | Practice: `A`, `D`, `←`, `→`, or either on-screen pad earns one point per press. |
+| Six Seven | Practice: press `A` or `←`, or tap the left pad for **6**. Press `D` or `→`, or tap the right pad for **7**. Each press earns one point. |
 
 ### Round controls
 

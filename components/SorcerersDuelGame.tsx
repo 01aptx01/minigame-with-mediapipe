@@ -686,7 +686,7 @@ export default function SorcerersDuelGame() {
           onPointerDown={() => setFallbackSpell('p1', 'lightning')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40"
         >
           ✌️ Lightning (1)
         </button>
@@ -695,7 +695,7 @@ export default function SorcerersDuelGame() {
           onPointerDown={() => setFallbackSpell('p1', 'shield')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/25"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/25 active:border-emerald-300 active:bg-emerald-500/40"
         >
           🖐️ Shield (2)
         </button>
@@ -704,7 +704,7 @@ export default function SorcerersDuelGame() {
           onPointerDown={() => setFallbackSpell('p1', 'crit')}
           onPointerUp={() => setFallbackSpell('p1', 'none')}
           onPointerLeave={() => setFallbackSpell('p1', 'none')}
-          className="whitespace-nowrap rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200 hover:bg-amber-500/25"
+          className="whitespace-nowrap rounded border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-200 transition-colors hover:bg-amber-500/25 active:border-amber-300 active:bg-amber-500/40"
         >
           ✊ Crit Fist (3)
         </button>

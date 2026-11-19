@@ -765,7 +765,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.left = false;
           }}
-          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25 sm:px-3"
+          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40 sm:px-3"
         >
           ← Left (A)
         </button>
@@ -780,7 +780,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.duck = false;
           }}
-          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-semibold text-emerald-200 hover:bg-emerald-500/30 sm:px-3"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/30 active:border-emerald-300 active:bg-emerald-500/45 sm:px-3"
         >
           ↓ Squat / Duck (S)
         </button>
@@ -795,7 +795,7 @@ export default function RhythmDodgeGame() {
           onPointerLeave={() => {
             inputRef.current.p1.right = false;
           }}
-          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25 sm:px-3"
+          className="whitespace-nowrap rounded border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40 sm:px-3"
         >
           Right (D) →
         </button>

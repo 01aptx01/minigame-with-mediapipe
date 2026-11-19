@@ -751,7 +751,7 @@ export default function NeonMuncherGame() {
           onPointerDown={() => { controlsRef.current.p1.left = true; }}
           onPointerUp={() => { controlsRef.current.p1.left = false; }}
           onPointerLeave={() => { controlsRef.current.p1.left = false; }}
-          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40"
         >
           ← Left (A)
         </button>
@@ -760,7 +760,7 @@ export default function NeonMuncherGame() {
           onPointerDown={() => { controlsRef.current.p1.open = true; }}
           onPointerUp={() => { controlsRef.current.p1.open = false; }}
           onPointerLeave={() => { controlsRef.current.p1.open = false; }}
-          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-bold text-emerald-200 hover:bg-emerald-500/30"
+          className="whitespace-nowrap rounded border border-emerald-500/40 bg-emerald-500/15 px-3 py-1 font-bold text-emerald-200 transition-colors hover:bg-emerald-500/30 active:border-emerald-300 active:bg-emerald-500/45"
         >
           😮 Open Wide (Space)
         </button>
@@ -769,7 +769,7 @@ export default function NeonMuncherGame() {
           onPointerDown={() => { controlsRef.current.p1.right = true; }}
           onPointerUp={() => { controlsRef.current.p1.right = false; }}
           onPointerLeave={() => { controlsRef.current.p1.right = false; }}
-          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 hover:bg-cyan-500/25"
+          className="whitespace-nowrap rounded border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40"
         >
           Right (D) →
         </button>

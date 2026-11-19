@@ -720,8 +720,8 @@ export default function PoseMatchGame() {
             onPointerLeave={() => triggerPuppetPose('p1', null)}
             className={`whitespace-nowrap rounded px-2 py-1 font-semibold transition-colors ${
               pose.isFakeout
-                ? 'border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/30'
-                : 'border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/25'
+                ? 'border border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-rose-500/30 active:border-rose-300 active:bg-rose-500/45'
+                : 'border border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/25 active:border-cyan-300 active:bg-cyan-500/40'
             }`}
           >
             {pose.label}

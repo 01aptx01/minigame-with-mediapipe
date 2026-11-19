@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import ArcadeHub from '@/components/ArcadeHub';
 
 const GameLoadingFallback = () => (
-  <div className="flex h-screen w-screen items-center justify-center bg-[#07090F] text-sm font-medium text-slate-300">
+  <div className="flex h-screen w-screen items-center justify-center bg-arcade-background text-sm font-medium text-slate-300">
     Loading Arcade Stage...
   </div>
 );

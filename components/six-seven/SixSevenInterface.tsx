@@ -67,7 +67,6 @@ export interface SixSevenInterfaceProps {
   score: number;
   remainingSec: number;
   roundSeconds: number;
-  nextNumber: 6 | 7;
   tracking: SixSevenTracking;
   trackingMessage: string;
   countdown: number | null;
@@ -116,10 +115,10 @@ function formatClipDate(value: string | number | Date): string {
 
 function trackingLabel(tracking: SixSevenTracking, mode: SixSevenInputMode): string {
   if (mode === 'practice') return 'PRACTICE BAY';
-  if (tracking === 'ready') return 'TRACKING READY';
+  if (tracking === 'ready') return 'WRIST TRACKING READY';
   if (tracking === 'looking') return 'FINDING WRISTS';
-  if (tracking === 'lost') return 'SIGNAL LOST';
-  return 'CAMERA STANDBY';
+  if (tracking === 'lost') return 'WRIST SIGNAL LOST';
+  return 'WRIST TRACKING OFF';
 }
 
 /**
@@ -128,7 +127,7 @@ function trackingLabel(tracking: SixSevenTracking, mode: SixSevenInputMode): str
  * drawing through phase changes and size itself from the viewport parent.
  */
 export function SixSevenInterface({
-  canvasRef, score, remainingSec, roundSeconds, nextNumber, tracking, trackingMessage,
+  canvasRef, score, remainingSec, roundSeconds, tracking, trackingMessage,
   countdown, phase, inputMode, cameraReady, cameraBusy, cameraError, clipEnabled,
   clipSupported, recording, clipStatus, clips, bestScore, playerName, muted,
   onInputMode, onCameraSetup, onStart, onPause, onRestart, onBackToSetup, onMute,
@@ -163,7 +162,7 @@ export function SixSevenInterface({
   };
   const closeClips = () => setClipsOpen(false);
   const startLabel = 'Start ' + roundSeconds + 's ' + (inputMode === 'camera' ? 'camera' : 'practice') + ' run';
-  const trackingText = trackingMessage || 'Pump either wrist to score.';
+  const trackingText = trackingMessage || 'Lift a wrist to pop its lane, then lower it before the next pop.';
   const clipLibraryLabel = clips.length > 0 ? 'Clips (' + clips.length + ')' : 'Clips';
 
   return (
@@ -217,7 +216,10 @@ export function SixSevenInterface({
                   <div><small>TIME</small><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
                   <span className={styles.mobileHudDivider} />
                   <div><small>HITS</small><strong key={score} className={score > 0 ? styles.popScore : undefined}>{score}</strong></div>
-                  <span className={styles.mobileHudNext} data-next={nextNumber}><small>NEXT POP</small><strong>{nextNumber}</strong></span>
+                  <span className={styles.mobileHudLanes} aria-label="6 in the left lane, 7 in the right lane">
+                    <span data-lane="left"><small>LEFT</small><strong>6</strong></span>
+                    <span data-lane="right"><small>RIGHT</small><strong>7</strong></span>
+                  </span>
                 </div>
               )}
               <div className={styles.canvasViewport}>
@@ -228,25 +230,22 @@ export function SixSevenInterface({
                 </div>
                 {phase === 'title' && !(inputMode === 'camera' && cameraReady) && (
                   <div className={styles.stageGuide} aria-label="Six Seven movement guide">
-                    <div className={styles.guideMove} data-next="6">
+                    <div className={styles.guideMove} data-lane="left">
                       <strong>6</strong>
-                      <span><small>LIFT</small><b>↑</b></span>
+                      <span><small>LEFT WRIST</small><b>↑↓</b></span>
                     </div>
                     <span className={styles.guideSwitch} aria-hidden="true">↔</span>
-                    <div className={styles.guideMove} data-next="7">
+                    <div className={styles.guideMove} data-lane="right">
                       <strong>7</strong>
-                      <span><small>LIFT</small><b>↑</b></span>
+                      <span><small>RIGHT WRIST</small><b>↑↓</b></span>
                     </div>
-                    <p>{inputMode === 'practice' ? 'Tap either side for +1' : 'Lift for +1. Lower that wrist and lift again.'}</p>
+                    <p>{inputMode === 'practice' ? 'Left = 6 · Right = 7 · Tap for +1' : 'Lift a wrist for +1, then lower it to reset.'}</p>
                   </div>
                 )}
                 {phase === 'playing' && countdown === null && (
-                  <div className={styles.stageCue} data-next={nextNumber}>
-                    <span>{nextNumber}</span>
-                    <div>
-                      <small>NEXT POP</small>
-                      <strong>{inputMode === 'practice' ? 'TAP EITHER SIDE' : 'LIFT EITHER WRIST'}</strong>
-                    </div>
+                  <div className={styles.stageLanes} aria-label="6 in the left lane, 7 in the right lane">
+                    <span data-lane="left"><strong>6</strong><small>LEFT LANE</small></span>
+                    <span data-lane="right"><strong>7</strong><small>RIGHT LANE</small></span>
                   </div>
                 )}
                 {phase === 'playing' && countdown !== null && (
@@ -284,17 +283,17 @@ export function SixSevenInterface({
               </div>
               <div className={styles.stageFooter}>
                 <span className={styles.stageFooterStatus}><span className={styles.smallStatusDot} data-state={tracking} />{phase === 'playing' ? trackingText : phase === 'paused' ? 'Round paused' : phase === 'gameover' ? (inputMode === 'practice' ? 'Practice score · not submitted' : 'Camera round complete') : inputMode === 'camera' ? (cameraReady ? 'Camera preview is live' : 'Camera preview appears after setup') : 'Practice controls appear after start'}</span>
-                <span className={styles.keyHint}>{phase === 'playing' && inputMode === 'practice' ? 'A / ←   D / →' : '+1 PER POP'}</span>
+                <span className={styles.keyHint}>{phase === 'playing' && inputMode === 'practice' ? 'A / ← LEFT · D / → RIGHT' : '6 LEFT · 7 RIGHT'}</span>
               </div>
             </div>
 
             {phase === 'playing' && inputMode === 'practice' && countdown === null && (
               <div className={styles.practiceControls} role="group" aria-label="Practice arm controls">
                 <button type="button" className={styles.practiceButton + ' ' + styles.leftPad} onClick={() => onPractice('left')}>
-                  <ArrowLeft size={17} aria-hidden="true" /><span><strong>Tap left</strong><small>A / ←</small></span>
+                  <ArrowLeft size={17} aria-hidden="true" /><span><strong>Tap left · 6</strong><small>A / ←</small></span>
                 </button>
                 <button type="button" className={styles.practiceButton + ' ' + styles.rightPad} onClick={() => onPractice('right')}>
-                  <span><strong>Tap right</strong><small>D / →</small></span><ArrowRight size={17} aria-hidden="true" />
+                  <span><strong>Tap right · 7</strong><small>D / →</small></span><ArrowRight size={17} aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -318,20 +317,20 @@ export function SixSevenInterface({
                   <div className={styles.cameraSetup}>
                     <div className={styles.cameraSetupTitle}>
                       <span className={styles.cameraStatusGlyph} data-ready={cameraCanStart ? 'true' : 'false'}>{cameraCanStart ? <Check size={15} /> : <Camera size={15} />}</span>
-                      <div><strong>{cameraCanStart ? 'Camera is ready' : cameraBusy ? 'Warming up camera' : cameraReady ? 'Find your hands' : 'Enable your camera'}</strong><small>{cameraCanStart ? 'Lift either wrist for +1. Lower it to pop again.' : cameraReady ? 'Keep your shoulders and a wrist visible.' : 'Your camera stays local to this device.'}</small></div>
+                      <div><strong>{cameraCanStart ? 'Wrist tracking is ready' : cameraBusy ? 'Warming up camera' : cameraReady ? 'Find a wrist' : 'Enable your camera'}</strong><small>{cameraCanStart ? 'Left wrist: 6. Right wrist: 7. Lift to score, lower to reset.' : cameraReady ? 'Show at least one wrist to the camera.' : 'Your camera stays local to this device.'}</small></div>
                     </div>
                     {!cameraReady && (
                       <button type="button" className={styles.cameraButton} disabled={cameraBusy} onClick={() => void onCameraSetup()}>
                         <Camera size={15} aria-hidden="true" />{cameraBusy ? 'Connecting…' : 'Enable camera'}
                       </button>
                     )}
-                    {cameraReady && tracking !== 'ready' && <div className={styles.trackingTip} role="status">{tracking === 'lost' ? 'Move your shoulders and a wrist back into view.' : 'Step back until the camera marks a wrist.'}</div>}
+                    {cameraReady && tracking !== 'ready' && <div className={styles.trackingTip} role="status">{tracking === 'lost' ? 'Move a wrist back into view.' : 'Show at least one wrist to the camera.'}</div>}
                     {cameraError && <p className={styles.errorText}>{cameraError}</p>}
                   </div>
                 ) : (
                   <div className={styles.practiceSetup}>
                     <Gamepad2 size={17} aria-hidden="true" />
-                    <p>Tap either pad or press <kbd>A</kbd>, <kbd>D</kbd>, <kbd>←</kbd> or <kbd>→</kbd>. Every tap is +1.</p>
+                    <p>Left pad or <kbd>A</kbd>/<kbd>←</kbd> pops 6. Right pad or <kbd>D</kbd>/<kbd>→</kbd> pops 7. Every tap is +1.</p>
                   </div>
                 )}
 
@@ -358,9 +357,13 @@ export function SixSevenInterface({
                 <div className={styles.liveCardHeader}><span>{phase === 'gameover' ? 'FINAL READOUT' : phase === 'paused' ? 'ROUND ON HOLD' : 'ROUND IN PROGRESS'}</span></div>
                 <div className={styles.timerRow}><span>TIME LEFT</span><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
                 <div className={styles.scoreRow}><span>YOUR SCORE</span><strong key={score} className={score > 0 ? styles.popScore : undefined}>{score}<small>HITS</small></strong></div>
-                <div className={styles.nextMove} data-next={nextNumber}>
-                  <div className={styles.nextMoveTop}><span>NEXT POP</span><strong>{nextNumber}</strong></div>
-                  <p>{inputMode === 'camera' ? 'Each lift earns +1. Lower to reset.' : 'Either side earns +1.'}</p>
+                <div className={styles.laneLegend} aria-label="Fixed number lanes">
+                  <div className={styles.laneLegendHeading}>FIXED LANES</div>
+                  <div className={styles.laneLegendRows}>
+                    <span data-lane="left"><strong>6</strong><small>LEFT</small></span>
+                    <span data-lane="right"><strong>7</strong><small>RIGHT</small></span>
+                  </div>
+                  <p>{inputMode === 'camera' ? 'Lift and lower each wrist to pop its lane again.' : 'Tap a lane for +1. Left is 6; right is 7.'}</p>
                 </div>
                 <div className={styles.liveStatus}><span className={styles.smallStatusDot} data-state={tracking} /><p>{trackingText}</p></div>
                 {recording && <div className={styles.recordingNotice}><span className={styles.recordingDot} /> Saving this camera run privately</div>}

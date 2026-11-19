@@ -1,19 +1,48 @@
 @import "tailwindcss";
 
+@theme {
+  --color-arcade-background: #07090f;
+  --color-arcade-text: #f1f5f9;
+}
+
 :root {
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --arcade-focus-ring: #67e8f9;
+  color-scheme: dark;
 }
 
 @layer base {
   html,
   body {
-    background-color: #07090f;
-    color: #f1f5f9;
+    background-color: var(--color-arcade-background);
+    color: var(--color-arcade-text);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--arcade-focus-ring);
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  button[aria-busy='true'] {
+    cursor: wait;
+  }
+
+  ::selection {
+    background: #155e75;
+    color: #f0fdfa;
   }
 
   h1,

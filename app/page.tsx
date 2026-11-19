@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#07090F] text-sm text-slate-400">
+        <div className="flex min-h-screen items-center justify-center bg-arcade-background text-sm text-slate-300">
           Loading Webcam Party Arcade...
         </div>
       }
