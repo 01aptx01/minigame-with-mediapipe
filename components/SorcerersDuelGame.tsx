@@ -6,7 +6,9 @@ import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
 import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
 import { ArcadeTitleCard } from '@/components/arcade/ArcadeTitleCard';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
+import { useArcadeReplay } from '@/hooks/useArcadeReplay';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import type { ReplayHudSnapshot } from '@/lib/games/shared/replay-canvas';
 import { getPlayerSideForX, projectLandmarkToCanvas } from '@/lib/games/neon-slash/engine';
 import {
   createParticlePool,
@@ -87,6 +89,19 @@ export default function SorcerersDuelGame() {
     recordScoreboardRound,
     handleClearScoreboard,
   } = useArcadeSession('sorcerers-duel', initialPhase, '1v1');
+  const {
+    enabled: replayEnabled,
+    setEnabled: setReplayEnabled,
+    clips: replayClips,
+    recording: replayRecording,
+    status: replayStatus,
+    supported: replaySupported,
+    start: startReplay,
+    pause: pauseReplay,
+    resume: resumeReplay,
+    finish: finishReplay,
+    remove: removeReplay,
+  } = useArcadeReplay({ gameId: 'sorcerers-duel', gameName: "Sorcerer's Duel" });
 
   const gameStateRef = useRef<SorcererGameState>(createInitialSorcererState(initialPhase, '1v1'));
   const particlesRef = useRef(createParticlePool(240));
@@ -96,6 +111,17 @@ export default function SorcerersDuelGame() {
   });
 
   const [endSummary, setEndSummary] = useState<SorcererEndSummary | null>(null);
+
+  const getReplayHudSnapshot = useCallback((): ReplayHudSnapshot => {
+    const state = gameStateRef.current;
+    return {
+      timeRemaining: state.timeRemaining,
+      p1Name: resolvedP1Name,
+      p1Score: state.p1.score,
+      p2Name: state.mode === 'solo' ? 'Arcane Bot' : resolvedP2Name,
+      p2Score: state.p2.score,
+    };
+  }, [resolvedP1Name, resolvedP2Name]);
 
   const syncHudDom = useCallback(
     (state: SorcererGameState) => {
@@ -123,6 +149,8 @@ export default function SorcerersDuelGame() {
       const nextMode = overrideMode ?? mode;
       const fresh = createInitialSorcererState('playing', nextMode);
       gameStateRef.current = fresh;
+      const canvas = canvasRef.current;
+      if (canvas) startReplay(canvas, getReplayHudSnapshot);
       clearFallbackSpells();
       resetParticlePool(particlesRef.current);
       setEndSummary(null);
@@ -130,7 +158,7 @@ export default function SorcerersDuelGame() {
       setPhase('playing');
       syncHudDom(fresh);
     },
-    [clearFallbackSpells, mode, setNewEntryIds, setPhase, syncHudDom]
+    [canvasRef, clearFallbackSpells, getReplayHudSnapshot, mode, setNewEntryIds, setPhase, startReplay, syncHudDom]
   );
 
   const handleModeChange = useCallback(
@@ -148,12 +176,14 @@ export default function SorcerersDuelGame() {
     if (current === 'playing') {
       gameStateRef.current.phase = 'paused';
       clearFallbackSpells();
+      pauseReplay();
       setPhase('paused');
     } else if (current === 'paused') {
       gameStateRef.current.phase = 'playing';
+      resumeReplay();
       setPhase('playing');
     }
-  }, [clearFallbackSpells, setPhase]);
+  }, [clearFallbackSpells, pauseReplay, resumeReplay, setPhase]);
 
   const setFallbackSpell = useCallback((player: PlayerId, spell: SpellKind) => {
     fallbackSpellRef.current[player] = spell;
@@ -524,6 +554,10 @@ export default function SorcerersDuelGame() {
 
       if (sim.roundEnded) {
         audioRef.current?.playRoundEnd();
+        finishReplay(
+          Math.max(state.p1.score, state.p2.score),
+          SORCERER_ROUND_DURATION_SEC - Math.max(0, state.timeRemaining)
+        );
         recordScoreboardRound(
           state.mode,
           { score: state.p1.score, detail: `${state.p1.hp} HP · ${state.p1.wins} hits` },
@@ -628,6 +662,7 @@ export default function SorcerersDuelGame() {
     audioRef,
     canvasRef,
     predict,
+    finishReplay,
     recordScoreboardRound,
     setPhase,
     sizeRef,
@@ -769,6 +804,16 @@ export default function SorcerersDuelGame() {
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
       onRestart={() => startNewRound()}
+      replayControls={{
+        gameName: "Sorcerer's Duel",
+        enabled: replayEnabled,
+        onEnabledChange: setReplayEnabled,
+        supported: replaySupported,
+        clips: replayClips,
+        status: replayStatus,
+        recording: replayRecording,
+        onRemove: removeReplay,
+      }}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
       bottomControls={bottomControls}

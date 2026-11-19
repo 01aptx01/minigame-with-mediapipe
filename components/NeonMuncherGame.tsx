@@ -7,7 +7,9 @@ import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
 import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
 import { ArcadeTitleCard } from '@/components/arcade/ArcadeTitleCard';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
+import { useArcadeReplay } from '@/hooks/useArcadeReplay';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import type { ReplayHudSnapshot } from '@/lib/games/shared/replay-canvas';
 import {
   analyzeFaceMouth,
   computeMuncherTugRatio,
@@ -93,6 +95,19 @@ export default function NeonMuncherGame() {
     recordScoreboardRound,
     handleClearScoreboard,
   } = useArcadeSession('neon-muncher', initialPhase, '1v1');
+  const {
+    enabled: replayEnabled,
+    setEnabled: setReplayEnabled,
+    clips: replayClips,
+    recording: replayRecording,
+    status: replayStatus,
+    supported: replaySupported,
+    start: startReplay,
+    pause: pauseReplay,
+    resume: resumeReplay,
+    finish: finishReplay,
+    remove: removeReplay,
+  } = useArcadeReplay({ gameId: 'neon-muncher', gameName: 'Neon Muncher' });
 
   const gameStateRef = useRef<MuncherGameState>(createInitialMuncherState(initialPhase, '1v1'));
   const particlesRef = useRef(createParticlePool(200));
@@ -104,6 +119,18 @@ export default function NeonMuncherGame() {
   });
 
   const [endSummary, setEndSummary] = useState<MuncherEndSummary | null>(null);
+
+  const getReplayHudSnapshot = useCallback((): ReplayHudSnapshot => {
+    const state = gameStateRef.current;
+    return {
+      timeRemaining: state.timeRemaining,
+      p1Name: resolvedP1Name,
+      p1Score: state.p1.score,
+      ...(state.mode === '1v1'
+        ? { p2Name: resolvedP2Name, p2Score: state.p2.score }
+        : {}),
+    };
+  }, [resolvedP1Name, resolvedP2Name]);
 
   const clearInputs = useCallback(() => {
     controlsRef.current.p1 = {
@@ -200,6 +227,8 @@ export default function NeonMuncherGame() {
       const nextMode = overrideMode ?? mode;
       const fresh = createInitialMuncherState('playing', nextMode);
       gameStateRef.current = fresh;
+      const canvas = canvasRef.current;
+      if (canvas) startReplay(canvas, getReplayHudSnapshot);
       shameSnapshotRef.current = null;
       clearInputs();
       resetParticlePool(particlesRef.current);
@@ -208,7 +237,7 @@ export default function NeonMuncherGame() {
       setPhase('playing');
       syncHudDom(fresh);
     },
-    [clearInputs, mode, setNewEntryIds, setPhase, syncHudDom]
+    [canvasRef, clearInputs, getReplayHudSnapshot, mode, setNewEntryIds, setPhase, startReplay, syncHudDom]
   );
 
   const handleModeChange = useCallback(
@@ -226,12 +255,14 @@ export default function NeonMuncherGame() {
     if (current === 'playing') {
       gameStateRef.current.phase = 'paused';
       clearInputs();
+      pauseReplay();
       setPhase('paused');
     } else if (current === 'paused') {
       gameStateRef.current.phase = 'playing';
+      resumeReplay();
       setPhase('playing');
     }
-  }, [clearInputs, setPhase]);
+  }, [clearInputs, pauseReplay, resumeReplay, setPhase]);
 
   // Keyboard fallback controls (P1: A/D move, W/Space open mouth, Q/E tilt; P2: Arrows move, Up/Enter open)
   useEffect(() => {
@@ -666,6 +697,10 @@ export default function NeonMuncherGame() {
 
       if (sim.roundEnded) {
         audioRef.current?.playRoundEnd();
+        finishReplay(
+          Math.max(state.p1.score, state.p2.score),
+          MUNCHER_ROUND_DURATION_SEC - Math.max(0, state.timeRemaining)
+        );
         recordScoreboardRound(
           state.mode,
           { score: state.p1.score, detail: `${state.p1.itemsMunched} munched` },
@@ -691,6 +726,7 @@ export default function NeonMuncherGame() {
     canvasRef,
     captureShameSnapshot,
     predictFace,
+    finishReplay,
     recordScoreboardRound,
     setPhase,
     sizeRef,
@@ -860,6 +896,16 @@ export default function NeonMuncherGame() {
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
       onRestart={() => startNewRound()}
+      replayControls={{
+        gameName: 'Neon Muncher',
+        enabled: replayEnabled,
+        onEnabledChange: setReplayEnabled,
+        supported: replaySupported,
+        clips: replayClips,
+        status: replayStatus,
+        recording: replayRecording,
+        onRemove: removeReplay,
+      }}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
       bottomControls={bottomControls}

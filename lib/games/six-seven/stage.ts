@@ -8,6 +8,24 @@ function colorFor(number: 6 | 7) {
   return number === 6 ? SIX : SEVEN;
 }
 
+/**
+ * Stable, normalized on-screen X for a hit effect. Hashing the hit keeps its
+ * placement unchanged across animation frames and between the live/capture
+ * canvases, while the side range keeps 6 left and 7 right.
+ */
+export function getSixSevenHitEffectX(hit: SixSevenHit): number {
+  const key = [hit.number, hit.side, hit.x, hit.y, hit.atMs].join(':');
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index++) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const variation = (hash >>> 0) / 0x1_0000_0000;
+  return hit.side === 'left'
+    ? 0.12 + variation * 0.31
+    : 0.57 + variation * 0.31;
+}
+
 function videoBounds(video: HTMLVideoElement | null, width: number, height: number) {
   const scale = video?.videoWidth && video.videoHeight
     ? Math.min(width / video.videoWidth, height / video.videoHeight)
@@ -91,10 +109,9 @@ export function drawSixSevenStage(
     const age = Math.max(0, nowMs - hit.atMs);
     if (age >= SIX_SEVEN_HIT_MS) continue;
     const t = age / SIX_SEVEN_HIT_MS;
-    // Pin the number to its mirrored screen lane so crossed arms never move
-    // a wrist's 6 or 7 into the other half of the stage.
-    const laneX = bounds.x + bounds.w * (hit.side === 'left' ? 0.27 : 0.73);
-    const x = Math.max(bounds.x + size / 2, Math.min(bounds.x + bounds.w - size / 2, laneX));
+    // Effect positions vary per hit, but stay on the hit's display-side lane.
+    const effectX = bounds.x + bounds.w * getSixSevenHitEffectX(hit);
+    const x = Math.max(bounds.x + size / 2, Math.min(bounds.x + bounds.w - size / 2, effectX));
     const point = project(hit);
     const y = Math.max(bounds.y + size / 2, point.y - size * (0.55 + (reducedMotion ? 0 : t)));
     const color = colorFor(hit.number);

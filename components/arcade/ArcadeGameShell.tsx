@@ -3,6 +3,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { ReplayLibrary } from '@/components/arcade/ReplayLibrary';
+import { ReplayOptIn } from '@/components/arcade/ReplayOptIn';
+import type { ArcadeReplayClip } from '@/lib/games/shared/replay-types';
 
 export type ArcadePhase = 'title' | 'playing' | 'paused' | 'gameover';
 
@@ -19,6 +22,17 @@ export interface ArcadeHudUpdate {
 
 export interface ArcadeHudHandle {
   updateHud: (data: ArcadeHudUpdate) => void;
+}
+
+export interface ArcadeReplayControls {
+  gameName: string;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  supported: boolean;
+  clips: ArcadeReplayClip[];
+  status: string;
+  recording: boolean;
+  onRemove: (id: string) => void | Promise<void>;
 }
 
 interface ArcadeGameShellProps {
@@ -41,6 +55,7 @@ interface ArcadeGameShellProps {
   endOverlay?: React.ReactNode;
   pauseSubtitle?: string;
   bottomControls?: React.ReactNode;
+  replayControls?: ArcadeReplayControls;
 }
 
 export function ArcadeGameShell({
@@ -63,6 +78,7 @@ export function ArcadeGameShell({
   endOverlay,
   pauseSubtitle = 'Take a breather or reset the 60-second clock.',
   bottomControls,
+  replayControls,
 }: ArcadeGameShellProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const timerTextRef = useRef<HTMLSpanElement | null>(null);
@@ -169,6 +185,8 @@ export function ArcadeGameShell({
   // Shared keyboard shortcuts: Enter/Space start, P/Esc pause, M mute, R restart
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return;
+
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
@@ -177,6 +195,14 @@ export function ArcadeGameShell({
           e.preventDefault();
           onStart();
         }
+        return;
+      }
+
+      if (
+        (e.key === 'Enter' || e.key === ' ') &&
+        e.target instanceof Element &&
+        e.target.closest('button, a, select, [role="button"], [contenteditable="true"]')
+      ) {
         return;
       }
 
@@ -413,7 +439,25 @@ export function ArcadeGameShell({
       {/* Title Screen Overlay */}
       {phase === 'title' && titleOverlay && (
         <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-arcade-background/92 px-4 pt-28 pb-6 sm:pt-24">
-          <div className="my-auto flex w-full justify-center">{titleOverlay}</div>
+          <div className="my-auto flex w-full flex-col items-center gap-3">
+            {titleOverlay}
+            {replayControls && (
+              <div className="flex w-full max-w-lg flex-col items-center gap-2.5">
+                <ReplayOptIn
+                  enabled={replayControls.enabled}
+                  onChange={replayControls.onEnabledChange}
+                  supported={replayControls.supported}
+                />
+                <ReplayLibrary
+                  gameName={replayControls.gameName}
+                  clips={replayControls.clips}
+                  status={replayControls.status}
+                  recording={replayControls.recording}
+                  onRemove={replayControls.onRemove}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -452,7 +496,28 @@ export function ArcadeGameShell({
       {/* End Game Overlay */}
       {phase === 'gameover' && endOverlay && (
         <div className="fixed inset-0 z-30 flex justify-center overflow-y-auto bg-arcade-background/92 px-4 pt-28 pb-6 sm:pt-24">
-          <div className="my-auto flex w-full justify-center">{endOverlay}</div>
+          <div className="my-auto flex w-full flex-col items-center gap-3">
+            {endOverlay}
+            {replayControls && (
+              <ReplayLibrary
+                gameName={replayControls.gameName}
+                clips={replayControls.clips}
+                status={replayControls.status}
+                recording={replayControls.recording}
+                onRemove={replayControls.onRemove}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {replayControls?.recording && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 z-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-rose-400/30 bg-[#0D121D]/95 px-3 py-1.5 text-xs font-semibold text-rose-200 shadow-lg"
+        >
+          <span className="h-2 w-2 animate-pulse rounded-full bg-rose-400" />
+          Recording locally · video only
         </div>
       )}
     </div>

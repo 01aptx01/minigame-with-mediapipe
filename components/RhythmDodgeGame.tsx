@@ -6,7 +6,9 @@ import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
 import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
 import { ArcadeTitleCard } from '@/components/arcade/ArcadeTitleCard';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
+import { useArcadeReplay } from '@/hooks/useArcadeReplay';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import type { ReplayHudSnapshot } from '@/lib/games/shared/replay-canvas';
 import { POSE_SKELETON_SEGMENTS } from '@/lib/games/pose-match/engine';
 import {
   assignPoseToZone,
@@ -83,6 +85,19 @@ export default function RhythmDodgeGame() {
     recordScoreboardRound,
     handleClearScoreboard,
   } = useArcadeSession('rhythm-dodge', initialPhase, '1v1');
+  const {
+    enabled: replayEnabled,
+    setEnabled: setReplayEnabled,
+    clips: replayClips,
+    recording: replayRecording,
+    status: replayStatus,
+    supported: replaySupported,
+    start: startReplay,
+    pause: pauseReplay,
+    resume: resumeReplay,
+    finish: finishReplay,
+    remove: removeReplay,
+  } = useArcadeReplay({ gameId: 'rhythm-dodge', gameName: 'Rhythm Dodge' });
 
   const gameStateRef = useRef<DodgeGameState>(createInitialDodgeGameState(initialPhase, '1v1'));
   const particlesRef = useRef(createParticlePool(180));
@@ -92,6 +107,18 @@ export default function RhythmDodgeGame() {
   });
 
   const [endSummary, setEndSummary] = useState<DodgeEndSummary | null>(null);
+
+  const getReplayHudSnapshot = useCallback((): ReplayHudSnapshot => {
+    const state = gameStateRef.current;
+    return {
+      timeRemaining: state.timeRemaining,
+      p1Name: resolvedP1Name,
+      p1Score: state.p1.score,
+      ...(state.mode === '1v1'
+        ? { p2Name: resolvedP2Name, p2Score: state.p2.score }
+        : {}),
+    };
+  }, [resolvedP1Name, resolvedP2Name]);
 
   useEffect(() => {
     void initializePoseModel();
@@ -125,6 +152,8 @@ export default function RhythmDodgeGame() {
       const nextMode = overrideMode ?? mode;
       const fresh = createInitialDodgeGameState('playing', nextMode);
       gameStateRef.current = fresh;
+      const canvas = canvasRef.current;
+      if (canvas) startReplay(canvas, getReplayHudSnapshot);
       clearInputs();
       resetParticlePool(particlesRef.current);
       setEndSummary(null);
@@ -132,7 +161,7 @@ export default function RhythmDodgeGame() {
       setPhase('playing');
       syncHudDom(fresh);
     },
-    [clearInputs, mode, setNewEntryIds, setPhase, syncHudDom]
+    [canvasRef, clearInputs, getReplayHudSnapshot, mode, setNewEntryIds, setPhase, startReplay, syncHudDom]
   );
 
   const handleModeChange = useCallback(
@@ -150,12 +179,14 @@ export default function RhythmDodgeGame() {
     if (current === 'playing') {
       gameStateRef.current.phase = 'paused';
       clearInputs();
+      pauseReplay();
       setPhase('paused');
     } else if (current === 'paused') {
       gameStateRef.current.phase = 'playing';
+      resumeReplay();
       setPhase('playing');
     }
-  }, [clearInputs, setPhase]);
+  }, [clearInputs, pauseReplay, resumeReplay, setPhase]);
 
   // Keyboard dodge/squat input fallback (A/D/S or Arrows for P1; J/L/K for P2)
   useEffect(() => {
@@ -574,6 +605,10 @@ export default function RhythmDodgeGame() {
 
       if (sim.roundEnded) {
         audioRef.current?.playRoundEnd();
+        finishReplay(
+          Math.max(state.p1.score, state.p2.score),
+          DODGE_ROUND_DURATION_SEC - Math.max(0, state.timeRemaining)
+        );
         recordScoreboardRound(
           state.mode,
           { score: state.p1.score, detail: `${state.p1.hp} HP · ${state.p1.dodgedCount} dodged` },
@@ -686,6 +721,7 @@ export default function RhythmDodgeGame() {
     audioRef,
     canvasRef,
     predictPose,
+    finishReplay,
     recordScoreboardRound,
     setPhase,
     sizeRef,
@@ -862,6 +898,16 @@ export default function RhythmDodgeGame() {
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
       onRestart={() => startNewRound()}
+      replayControls={{
+        gameName: 'Rhythm Dodge',
+        enabled: replayEnabled,
+        onEnabledChange: setReplayEnabled,
+        supported: replaySupported,
+        clips: replayClips,
+        status: replayStatus,
+        recording: replayRecording,
+        onRemove: removeReplay,
+      }}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
       bottomControls={bottomControls}

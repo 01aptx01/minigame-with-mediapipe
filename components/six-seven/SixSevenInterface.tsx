@@ -144,6 +144,9 @@ export function SixSevenInterface({
   const cameraCanStart = cameraReady && tracking === 'ready' && !cameraBusy;
   const startDisabled = inputMode === 'camera' && !cameraCanStart;
   const needsCameraReconnect = phase === 'paused' && inputMode === 'camera' && !cameraReady;
+  const displayClipStatus = clipStatus === 'Clip recording is off.' ? '' : clipStatus;
+  const showLiveClipStatus = clipEnabled && !recording && (phase === 'playing' || phase === 'paused') &&
+    /^(Could not|Recording stopped|Video recording|No video|The clip)/.test(displayClipStatus);
 
   useEffect(() => {
     if (!clipsOpen) return;
@@ -181,6 +184,11 @@ export function SixSevenInterface({
             </div>
           </div>
           <div className={styles.headerActions}>
+            {phase !== 'title' && (
+              <button className={styles.secondaryButton + ' ' + styles.setupButton} type="button" onClick={onBackToSetup}>
+                <ArrowLeft size={15} aria-hidden="true" /><span>Setup</span>
+              </button>
+            )}
             {(phase === 'title' || phase === 'gameover') && (
               <button className={styles.secondaryButton} type="button" onClick={openClips}>
                 <Video size={16} aria-hidden="true" /><span>{clipLibraryLabel}</span>
@@ -194,7 +202,7 @@ export function SixSevenInterface({
 
         <div className={styles.topRule} />
 
-        <div className={styles.layout + (phase !== 'title' ? ' ' + styles.layoutLive : '')}>
+        <div className={styles.layout} data-phase={phase} data-input-mode={inputMode}>
           <section className={styles.arenaColumn} aria-label="Six Seven game stage">
             <div className={styles.stageHeader}>
               <div className={styles.stageHeading}>
@@ -211,7 +219,7 @@ export function SixSevenInterface({
             </div>
 
             <div className={styles.stageCard}>
-              {phase !== 'title' && (
+              {phase !== 'title' && countdown === null && (
                 <div className={styles.mobileHud} role="group" aria-label="Round score and time">
                   <div><small>TIME</small><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
                   <span className={styles.mobileHudDivider} />
@@ -224,9 +232,10 @@ export function SixSevenInterface({
               )}
               <div className={styles.canvasViewport}>
                 <canvas ref={canvasRef} className={styles.canvas} data-testid="six-seven-canvas" aria-label="Six Seven live game canvas" />
-                <div className={styles.canvasTopLine} aria-hidden="true">
-                  <span className={styles.feedTag}><span className={styles.feedDot} />{inputMode === 'camera' ? (cameraReady ? 'CAMERA FEED' : 'CAMERA IDLE') : 'NO CAMERA NEEDED'}</span>
-                  <span className={styles.stageTag}>{trackingLabel(tracking, inputMode)}</span>
+                <div className={styles.canvasTopLine + (recording ? ' ' + styles.canvasTopLineRecording : '')}>
+                  <span className={styles.feedTag} aria-hidden="true"><span className={styles.feedDot} />{inputMode === 'camera' ? (cameraReady ? 'CAMERA FEED' : 'CAMERA IDLE') : 'NO CAMERA NEEDED'}</span>
+                  <span className={styles.stageTag} aria-hidden="true">{trackingLabel(tracking, inputMode)}</span>
+                  {recording && <span className={styles.recordingTag} role="status"><span className={styles.recordingDot} />SAVING CLIP</span>}
                 </div>
                 {phase === 'title' && !(inputMode === 'camera' && cameraReady) && (
                   <div className={styles.stageGuide} aria-label="Six Seven movement guide">
@@ -242,12 +251,6 @@ export function SixSevenInterface({
                     <p>{inputMode === 'practice' ? 'Left = 6 · Right = 7 · Tap for +1' : 'Lift a wrist for +1, then lower it to reset.'}</p>
                   </div>
                 )}
-                {phase === 'playing' && countdown === null && (
-                  <div className={styles.stageLanes} aria-label="6 in the left lane, 7 in the right lane">
-                    <span data-lane="left"><strong>6</strong><small>LEFT LANE</small></span>
-                    <span data-lane="right"><strong>7</strong><small>RIGHT LANE</small></span>
-                  </div>
-                )}
                 {phase === 'playing' && countdown !== null && (
                   <div className={styles.countdownLayer} aria-live="assertive">
                     <span>{countdown === 0 ? 'GO' : countdown}</span><small>GET SET</small>
@@ -256,6 +259,7 @@ export function SixSevenInterface({
                 {phase === 'playing' && countdown === null && inputMode === 'camera' && tracking === 'lost' && (
                   <div className={styles.lostSignal} role="status"><span />{trackingText}</div>
                 )}
+                {showLiveClipStatus && <div className={styles.clipLiveStatus} role="status">{displayClipStatus}</div>}
                 {phase === 'paused' && (
                   <div className={styles.phaseOverlay}>
                     <h2>Paused</h2>
@@ -273,11 +277,12 @@ export function SixSevenInterface({
                     <h2>{inputMode === 'practice' ? 'Practice complete' : 'Round complete'}</h2>
                     <div className={styles.resultScore}>{score}<small>HITS</small></div>
                     <p>{inputMode === 'practice' ? 'Practice score · local only.' : 'Camera round complete.'}</p>
+                    {inputMode === 'camera' && <div className={styles.resultBest}>CAMERA BEST <strong>{bestScore}</strong></div>}
                     <div className={styles.resultActions}>
                       <button className={styles.primaryButton} type="button" onClick={onRestart}><RotateCcw size={15} aria-hidden="true" /> Run it back</button>
                       <button className={styles.ghostButton} type="button" onClick={openClips}><Video size={15} aria-hidden="true" /> Browse clips</button>
                     </div>
-                    {clipStatus && <p className={styles.resultClipStatus} role="status">{recording && <span className={styles.recordingDot} />}{clipStatus}</p>}
+                    {displayClipStatus && <p className={styles.resultClipStatus} role="status">{recording && <span className={styles.recordingDot} />}{displayClipStatus}</p>}
                   </div>
                 )}
               </div>
@@ -299,8 +304,8 @@ export function SixSevenInterface({
             )}
           </section>
 
-          <aside className={styles.infoColumn}>
-            {phase === 'title' ? (
+          {phase === 'title' && (
+            <aside className={styles.infoColumn}>
               <section className={styles.setupCard} aria-labelledby="setup-title">
                 <div className={styles.cardEyebrow}><Sparkles size={14} aria-hidden="true" /> QUICK SETUP <span>{roundSeconds}s ROUND</span></div>
                 <h2 id="setup-title">Pick your lane.</h2>
@@ -339,48 +344,20 @@ export function SixSevenInterface({
                   <input type="text" maxLength={18} value={playerName} onChange={(event) => onPlayerNameChange(event.target.value)} placeholder="Your name" autoComplete="nickname" />
                 </label>
 
-                {inputMode === 'camera' && (
-                  <div className={styles.clipSetting}>
-                    <div className={styles.clipSettingCopy}><Video size={16} aria-hidden="true" /><span><strong>Save my camera runs</strong><small>{clipSupported ? (clipEnabled ? 'Private clips stay on this device.' : 'Turn on to keep highlights here.') : 'Video capture is not available here.'}</small></span></div>
-                    <button type="button" role="switch" aria-checked={clipEnabled} aria-label="Save my camera runs" disabled={!clipSupported} onClick={() => onClipEnabled(!clipEnabled)} className={styles.switch + (clipEnabled ? ' ' + styles.switchOn : '')}><span /></button>
-                  </div>
-                )}
-                {inputMode === 'camera' && clipStatus && <p className={styles.clipStatus} role="status">{recording && <span className={styles.recordingDot} />}{clipStatus}</p>}
+                <div className={styles.clipSetting}>
+                  <div className={styles.clipSettingCopy}><Video size={16} aria-hidden="true" /><span><strong>Save replays locally</strong><small>{clipSupported ? (clipEnabled ? 'Private clips stay on this device.' : 'Turn on to keep highlights here.') : 'Video capture is not available here.'}</small></span></div>
+                  <button type="button" role="switch" aria-checked={clipEnabled} aria-label="Save replays locally" disabled={!clipSupported} onClick={() => onClipEnabled(!clipEnabled)} className={styles.switch + (clipEnabled ? ' ' + styles.switchOn : '')}><span /></button>
+                </div>
+                {displayClipStatus && <p className={styles.clipStatus} role="status">{recording && <span className={styles.recordingDot} />}{displayClipStatus}</p>}
 
                 <button type="button" className={styles.startButton} disabled={startDisabled} onClick={onStart}>
                   <Play size={17} fill="currentColor" aria-hidden="true" />{startDisabled ? (cameraBusy ? 'Getting camera ready…' : 'Waiting for tracking…') : startLabel}<span>→</span>
                 </button>
                 <p className={styles.setupNote}>{inputMode === 'camera' ? 'Moves are processed live; no video is uploaded.' : 'Practice scores stay on this device.'}</p>
               </section>
-            ) : (
-              <section className={styles.liveCard} aria-label="Live game score">
-                <div className={styles.liveCardHeader}><span>{phase === 'gameover' ? 'FINAL READOUT' : phase === 'paused' ? 'ROUND ON HOLD' : 'ROUND IN PROGRESS'}</span></div>
-                <div className={styles.timerRow}><span>TIME LEFT</span><strong data-low={remainingSec <= 8 && phase === 'playing' ? 'true' : 'false'}>{formatClock(remainingSec)}</strong></div>
-                <div className={styles.scoreRow}><span>YOUR SCORE</span><strong key={score} className={score > 0 ? styles.popScore : undefined}>{score}<small>HITS</small></strong></div>
-                <div className={styles.laneLegend} aria-label="Fixed number lanes">
-                  <div className={styles.laneLegendHeading}>FIXED LANES</div>
-                  <div className={styles.laneLegendRows}>
-                    <span data-lane="left"><strong>6</strong><small>LEFT</small></span>
-                    <span data-lane="right"><strong>7</strong><small>RIGHT</small></span>
-                  </div>
-                  <p>{inputMode === 'camera' ? 'Lift and lower each wrist to pop its lane again.' : 'Tap a lane for +1. Left is 6; right is 7.'}</p>
-                </div>
-                <div className={styles.liveStatus}><span className={styles.smallStatusDot} data-state={tracking} /><p>{trackingText}</p></div>
-                {recording && <div className={styles.recordingNotice}><span className={styles.recordingDot} /> Saving this camera run privately</div>}
-                {!recording && phase === 'playing' && countdown === null && inputMode === 'camera' && clipEnabled &&
-                  /^(Could not|Recording stopped|Video recording)/.test(clipStatus) && (
-                    <p className={styles.errorText} role="status">{clipStatus}</p>
-                  )}
-                <div className={styles.liveActions}>
-                  {!needsCameraReconnect && <button type="button" className={styles.textButton} onClick={onBackToSetup}><ArrowLeft size={14} aria-hidden="true" /> Setup</button>}
-                </div>
-                {phase === 'gameover' && inputMode === 'camera' && <div className={styles.bestScore}><span>CAMERA BEST</span><strong>{bestScore}</strong></div>}
-              </section>
-            )}
-
-            {phase === 'title' && leaderboard && <div className={styles.leaderboard}>{leaderboard}</div>}
-            {phase !== 'title' && phase !== 'gameover' && <p className={styles.keyboardNote}>Camera + practice · <span>P</span> pause <span>M</span> sound</p>}
-          </aside>
+              {leaderboard && <div className={styles.leaderboard}>{leaderboard}</div>}
+            </aside>
+          )}
         </div>
 
         {phase === 'title' && inputMode === 'camera' && (
@@ -417,7 +394,7 @@ export function SixSevenInterface({
               <button className={styles.dialogClose} type="button" data-close-clips aria-label="Close clips" onClick={closeClips}><X size={19} aria-hidden="true" /></button>
             </div>
             <p className={styles.dialogIntro}>Runs saved on this device. Play them back, download a copy, or clear out a take.</p>
-            {clipStatus && <p className={styles.dialogStatus} role="status">{recording && <span className={styles.recordingDot} />}{clipStatus}</p>}
+            {displayClipStatus && <p className={styles.dialogStatus} role="status">{recording && <span className={styles.recordingDot} />}{displayClipStatus}</p>}
             {orderedClips.length > 0 ? (
               <div className={styles.clipList}>
                 {orderedClips.map((clip, index) => {
@@ -439,7 +416,7 @@ export function SixSevenInterface({
               <div className={styles.emptyClips}>
                 <span className={styles.emptyIcon}><Video size={21} aria-hidden="true" /></span>
                 <strong>No clips yet</strong>
-                <p>{clipSupported ? 'Turn on “Save my camera runs” before your next round. Your replay will show up here.' : 'This browser does not support local video clips.'}</p>
+                <p>{clipSupported ? 'Turn on “Save replays locally” before your next round. Your replay will show up here.' : 'This browser does not support local video clips.'}</p>
               </div>
             )}
             <div className={styles.dialogFooter}><span><span className={styles.privacyDot} /> Clips are private and stored locally</span><button type="button" className={styles.doneButton} onClick={closeClips}>Done</button></div>

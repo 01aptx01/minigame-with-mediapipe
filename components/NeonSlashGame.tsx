@@ -6,7 +6,9 @@ import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
 import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
 import { ArcadeTitleCard } from '@/components/arcade/ArcadeTitleCard';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
+import { useArcadeReplay } from '@/hooks/useArcadeReplay';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import type { ReplayHudSnapshot } from '@/lib/games/shared/replay-canvas';
 import {
   applySliceOutcome,
   computeTugOfWarRatio,
@@ -83,6 +85,19 @@ export default function NeonSlashGame() {
     recordScoreboardRound,
     handleClearScoreboard,
   } = useArcadeSession('neon-slash-duel', initialPhase, '1v1');
+  const {
+    enabled: replayEnabled,
+    setEnabled: setReplayEnabled,
+    clips: replayClips,
+    recording: replayRecording,
+    status: replayStatus,
+    supported: replaySupported,
+    start: startReplay,
+    pause: pauseReplay,
+    resume: resumeReplay,
+    finish: finishReplay,
+    remove: removeReplay,
+  } = useArcadeReplay({ gameId: 'neon-slash-duel', gameName: 'Neon Slash Duel' });
 
   const gameStateRef = useRef<GameState>(createInitialGameState(initialPhase, '1v1'));
   const particlesRef = useRef(createParticlePool(220));
@@ -91,6 +106,18 @@ export default function NeonSlashGame() {
   const lastPointerPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const [endSummary, setEndSummary] = useState<EndGameSummary | null>(null);
+
+  const getReplayHudSnapshot = useCallback((): ReplayHudSnapshot => {
+    const state = gameStateRef.current;
+    return {
+      timeRemaining: state.timeRemaining,
+      p1Name: resolvedP1Name,
+      p1Score: state.p1.score,
+      ...(state.mode === '1v1'
+        ? { p2Name: resolvedP2Name, p2Score: state.p2.score }
+        : {}),
+    };
+  }, [resolvedP1Name, resolvedP2Name]);
 
   const syncHudDom = useCallback(
     (state: GameState) => {
@@ -186,6 +213,8 @@ export default function NeonSlashGame() {
       const nextMode = overrideMode ?? mode;
       const fresh = createInitialGameState('playing', nextMode);
       gameStateRef.current = fresh;
+      const canvas = canvasRef.current;
+      if (canvas) startReplay(canvas, getReplayHudSnapshot);
       resetParticlePool(particlesRef.current);
       bladesRef.current.clear();
       setEndSummary(null);
@@ -193,7 +222,7 @@ export default function NeonSlashGame() {
       setPhase('playing');
       syncHudDom(fresh);
     },
-    [mode, setNewEntryIds, setPhase, syncHudDom]
+    [canvasRef, getReplayHudSnapshot, mode, setNewEntryIds, setPhase, startReplay, syncHudDom]
   );
 
   const handleModeChange = useCallback(
@@ -210,12 +239,14 @@ export default function NeonSlashGame() {
     const current = gameStateRef.current.phase;
     if (current === 'playing') {
       gameStateRef.current.phase = 'paused';
+      pauseReplay();
       setPhase('paused');
     } else if (current === 'paused') {
       gameStateRef.current.phase = 'playing';
+      resumeReplay();
       setPhase('playing');
     }
-  }, [setPhase]);
+  }, [pauseReplay, resumeReplay, setPhase]);
 
   // Pointer/Mouse Laser Blade input fallback
   useEffect(() => {
@@ -567,6 +598,10 @@ export default function NeonSlashGame() {
       }
       if (simOutcome.roundEnded) {
         audioRef.current?.playRoundEnd();
+        finishReplay(
+          Math.max(state.p1.score, state.p2.score),
+          ROUND_DURATION_SEC - Math.max(0, state.timeRemaining)
+        );
         recordScoreboardRound(
           state.mode,
           { score: state.p1.score, detail: `${state.p1.maxCombo}x max` },
@@ -751,6 +786,7 @@ export default function NeonSlashGame() {
     canvasRef,
     predict,
     recordScoreboardRound,
+    finishReplay,
     setPhase,
     sizeRef,
     sliceTargetWithSegment,
@@ -871,6 +907,16 @@ export default function NeonSlashGame() {
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
       onRestart={() => startNewRound()}
+      replayControls={{
+        gameName: 'Neon Slash Duel',
+        enabled: replayEnabled,
+        onEnabledChange: setReplayEnabled,
+        supported: replaySupported,
+        clips: replayClips,
+        status: replayStatus,
+        recording: replayRecording,
+        onRemove: removeReplay,
+      }}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
     />
