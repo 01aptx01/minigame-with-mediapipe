@@ -1,8 +1,8 @@
-import type { SixSevenHit, SixSevenLandmark } from './engine';
+import { getSixSevenWrist, type SixSevenHit, type SixSevenLandmark } from './engine';
 
-const SIX = '#73eaff';
-const SEVEN = '#ff85ab';
-export const SIX_SEVEN_HIT_MS = 540;
+const SIX = '#00e5ff';
+const SEVEN = '#ff5690';
+export const SIX_SEVEN_HIT_MS = 440;
 
 function colorFor(number: 6 | 7) {
   return number === 6 ? SIX : SEVEN;
@@ -22,7 +22,6 @@ interface StageFrame {
   pose: readonly SixSevenLandmark[] | null;
   hits: readonly SixSevenHit[];
   nowMs: number;
-  nextNumber: 6 | 7;
   reducedMotion: boolean;
 }
 
@@ -30,10 +29,10 @@ export function drawSixSevenStage(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  { video, pose, hits, nowMs, nextNumber, reducedMotion }: StageFrame
+  { video, pose, hits, nowMs, reducedMotion }: StageFrame
 ) {
   const bounds = videoBounds(video, width, height);
-  ctx.fillStyle = '#111518';
+  ctx.fillStyle = '#090d16';
   ctx.fillRect(0, 0, width, height);
 
   if (video && video.readyState >= 2 && video.videoWidth && video.videoHeight) {
@@ -44,7 +43,7 @@ export function drawSixSevenStage(
     ctx.restore();
   } else {
     const line = Math.max(20, Math.round(width / 19));
-    ctx.strokeStyle = '#24282c';
+    ctx.strokeStyle = 'rgba(148, 163, 184, .1)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = width / 2 % line; x < width; x += line) {
@@ -68,20 +67,21 @@ export function drawSixSevenStage(
   });
 
   if (pose) {
-    for (const [wristIndex, number] of [[15, 6], [16, 7]] as const) {
-      const point = project(pose[wristIndex]);
-      const active = nextNumber === number;
-      const radius = active ? 13 : 9;
+    for (const [side, color] of [['left', SIX], ['right', SEVEN]] as const) {
+      const wrist = getSixSevenWrist(pose, side);
+      if (!wrist) continue;
+      const point = project(wrist);
+      const radius = 11;
       ctx.beginPath();
       ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(12,17,21,.72)';
+      ctx.fillStyle = 'rgba(9, 13, 22, .78)';
       ctx.fill();
-      ctx.strokeStyle = colorFor(number);
-      ctx.lineWidth = active ? 2.5 : 1.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = colorFor(number);
+      ctx.fillStyle = color;
       ctx.fill();
     }
   }
@@ -101,12 +101,14 @@ export function drawSixSevenStage(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = `900 ${size}px system-ui, sans-serif`;
-    ctx.strokeStyle = '#111518';
+    ctx.strokeStyle = '#090d16';
     ctx.lineWidth = Math.max(3, size / 9);
     ctx.lineJoin = 'round';
     ctx.strokeText(String(hit.number), x, y);
     ctx.fillStyle = color;
     ctx.fillText(String(hit.number), x, y);
+    ctx.font = `800 ${Math.max(11, size * .27)}px ui-monospace, monospace`;
+    ctx.fillText('+1', x, y - size * .62);
 
     if (!reducedMotion) {
       ctx.strokeStyle = color;
@@ -133,15 +135,15 @@ export function drawSixSevenClipHud(
   remainingSeconds: number,
   roundSeconds: number
 ) {
-  ctx.fillStyle = '#141619';
+  ctx.fillStyle = '#0d121e';
   ctx.fillRect(0, 0, width, 52);
   ctx.fillRect(0, height - 5, width, 5);
-  ctx.fillStyle = '#c6f663';
+  ctx.fillStyle = SIX;
   ctx.fillRect(0, height - 5, width * remainingSeconds / roundSeconds, 5);
   ctx.font = '900 18px system-ui, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText('SIX SEVEN', 18, 26);
-  ctx.fillStyle = '#fff9ec';
+  ctx.fillStyle = '#f8fafc';
   ctx.font = '700 19px ui-monospace, monospace';
   ctx.textAlign = 'center';
   ctx.fillText(String(Math.ceil(remainingSeconds)).padStart(2, '0') + 's', width / 2, 26);
