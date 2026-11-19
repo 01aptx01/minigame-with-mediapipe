@@ -179,6 +179,47 @@ test('an occluded wrist reacquires a baseline instead of scoring a jump', () => 
   assert.equal(state.score, 0);
 });
 
+test('brief total pose dropouts keep motion tracks warm without scoring on reacquisition', () => {
+  const state = createSixSevenState();
+  updateSixSevenGesture(state, pose(), 0);
+  updateSixSevenGesture(state, pose(0.54), 30);
+  updateSixSevenGesture(state, null, 60);
+  updateSixSevenGesture(state, null, 90);
+  assert.deepEqual(updateSixSevenGesture(state, pose(0.48), 120), []);
+  assert.equal(state.score, 0);
+
+  // The missed lift is discarded; a new visible stroke still scores.
+  updateSixSevenGesture(state, pose(0.56), 150);
+  updateSixSevenGesture(state, pose(0.53), 180);
+  const hits = updateSixSevenGesture(state, pose(0.49), 210);
+  assert.deepEqual(hits.map(hit => hit.number), [6]);
+  assert.equal(state.score, 1);
+});
+
+test('a brief omission can confirm that a scored wrist lowered and rearm it', () => {
+  const state = createSixSevenState();
+  updateSixSevenGesture(state, pose(), 0);
+  updateSixSevenGesture(state, pose(0.53), 30);
+  assert.equal(updateSixSevenGesture(state, pose(0.49), 60).length, 1);
+  updateSixSevenGesture(state, null, 90);
+  assert.deepEqual(updateSixSevenGesture(state, pose(0.56), 120), []);
+  updateSixSevenGesture(state, pose(0.53), 150);
+  assert.equal(updateSixSevenGesture(state, pose(0.49), 180).length, 1);
+  assert.equal(state.score, 2);
+});
+
+test('slow inference gaps preserve continuous strokes but longer gaps rebase safely', () => {
+  const state = createSixSevenState();
+  updateSixSevenGesture(state, pose(), 0);
+  updateSixSevenGesture(state, pose(0.53), 180);
+  assert.equal(updateSixSevenGesture(state, pose(0.49), 360).length, 1);
+  assert.equal(state.score, 1);
+
+  // A long worker stall is treated as an unseen interval, never a giant lift.
+  assert.deepEqual(updateSixSevenGesture(state, pose(0.56), 900), []);
+  assert.equal(state.score, 1);
+});
+
 test('shoulder and body landmarks are not needed or consulted', () => {
   const state = createSixSevenState();
   const landmarks = pose();

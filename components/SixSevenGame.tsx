@@ -9,6 +9,7 @@ import { useArcadeSession } from '@/hooks/useArcadeSession';
 import { useSixSevenReplay } from '@/hooks/useSixSevenReplay';
 import {
   createSixSevenState,
+  getSixSevenWrist,
   isSixSevenPoseVisible,
   registerSixSevenPracticeHit,
   resetSixSevenTracking,
@@ -25,6 +26,8 @@ const ROUND_SECONDS = 30;
 const COUNTDOWN_MS = 3000;
 const MAX_POSE_RESULT_AGE_MS = 300;
 const POSE_SIGNAL_LOST_MS = 600;
+const POSE_WRIST_PREVIEW_HOLD_MS = 260;
+const MAX_STAGE_BITMAP_PIXELS = 2_100_000;
 const CLIP_FRAME_MS = 1000 / SIX_SEVEN_CAPTURE_FPS;
 type InputMode = 'camera' | 'practice';
 type Tracking = 'off' | 'looking' | 'ready' | 'lost';
@@ -48,6 +51,37 @@ const TRACKING_MESSAGES: Record<Tracking, string> = {
 function secondsRemaining(round: Round, nowMs: number) {
   const elapsedMs = Math.max(0, (round.pausedAtMs ?? nowMs) - round.startsAtMs);
   return Math.max(0, ROUND_SECONDS - elapsedMs / 1000);
+}
+
+function updatePosePreview(
+  current: readonly SixSevenLandmark[] | null,
+  incoming: readonly SixSevenLandmark[] | null,
+  lastSeenAt: { left: number; right: number },
+  nowMs: number
+): readonly SixSevenLandmark[] | null {
+  let next: SixSevenLandmark[] | null = null;
+
+  for (let wristIndex = 0; wristIndex < 2; wristIndex += 1) {
+    const side = wristIndex === 0 ? 'left' : 'right';
+    const landmarkIndex = wristIndex === 0 ? 15 : 16;
+    const wrist = getSixSevenWrist(incoming, side);
+    if (wrist) {
+      lastSeenAt[side] = nowMs;
+      if (current?.[landmarkIndex] !== wrist) {
+        next ??= current ? [...current] : [];
+        next[landmarkIndex] = wrist;
+      }
+    } else if (lastSeenAt[side] > 0 && nowMs - lastSeenAt[side] > POSE_WRIST_PREVIEW_HOLD_MS) {
+      if (current?.[landmarkIndex]) {
+        next ??= [...current];
+        delete next[landmarkIndex];
+      }
+      lastSeenAt[side] = 0;
+    }
+  }
+
+  if (!next) return current;
+  return isSixSevenPoseVisible(next) ? next : null;
 }
 
 export default function SixSevenGame() {
@@ -79,6 +113,7 @@ export default function SixSevenGame() {
   const gameRef = useRef(createSixSevenState());
   const trackingRef = useRef<Tracking>('off');
   const poseRef = useRef<readonly SixSevenLandmark[] | null>(null);
+  const previewWristSeenAtRef = useRef({ left: 0, right: 0 });
   const freshPoseAtRef = useRef(0);
   const poseEpochRef = useRef(0);
   const reducedMotionRef = useRef(false);
@@ -105,6 +140,7 @@ export default function SixSevenGame() {
     if (clearPreview) {
       poseRef.current = null;
       freshPoseAtRef.current = 0;
+      previewWristSeenAtRef.current = { left: 0, right: 0 };
     }
   }, []);
 
@@ -179,7 +215,7 @@ export default function SixSevenGame() {
       pausedAtMs: null,
       displayedCountdown: COUNTDOWN_MS / 1000,
       displayedSeconds: ROUND_SECONDS,
-      wantsClip: modeRef.current === 'camera' && clipEnabled && clipSupported,
+      wantsClip: clipEnabled && clipSupported,
       recordingStarted: false,
     };
     audioRef.current?.playCountdownTick();
@@ -297,8 +333,9 @@ export default function SixSevenGame() {
         if (cancelled || epoch !== poseEpochRef.current || document.hidden) return;
         const receivedAtMs = performance.now();
         if (receivedAtMs - nowMs > MAX_POSE_RESULT_AGE_MS) return;
-        if (!pose || !isSixSevenPoseVisible(pose)) {
-          poseRef.current = null;
+        const hasPose = isSixSevenPoseVisible(pose);
+        poseRef.current = updatePosePreview(poseRef.current, pose, previewWristSeenAtRef.current, receivedAtMs);
+        if (!hasPose) {
           if (receivedAtMs - freshPoseAtRef.current > POSE_SIGNAL_LOST_MS && trackingRef.current === 'ready') {
             changeTracking('lost');
           }
@@ -306,7 +343,6 @@ export default function SixSevenGame() {
           return;
         }
 
-        poseRef.current = pose;
         freshPoseAtRef.current = receivedAtMs;
         changeTracking('ready');
         const round = roundRef.current;
@@ -342,7 +378,8 @@ export default function SixSevenGame() {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       if (width === 0 || height === 0) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const pixelCap = Math.sqrt(MAX_STAGE_BITMAP_PIXELS / (width * height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5, pixelCap);
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       sizeRef.current = { width, height };
@@ -379,6 +416,7 @@ export default function SixSevenGame() {
         changeTracking('off');
       }
 
+      poseRef.current = updatePosePreview(poseRef.current, null, previewWristSeenAtRef.current, nowMs);
       const pose = showingCamera ? poseRef.current : null;
       const frame = { video, pose, hits: hitsRef.current, nowMs, reducedMotion: reducedMotionRef.current };
       while (frame.hits[0] && nowMs - frame.hits[0].atMs >= SIX_SEVEN_HIT_MS) frame.hits.shift();
@@ -397,7 +435,7 @@ export default function SixSevenGame() {
           setRemainingSec(displaySeconds);
         }
 
-        if (count === null && round.wantsClip && !round.recordingStarted && video) {
+        if (count === null && round.wantsClip && !round.recordingStarted) {
           round.recordingStarted = true;
           const capture = document.createElement('canvas');
           capture.width = 640;
@@ -474,7 +512,7 @@ export default function SixSevenGame() {
       muted={isMuted}
       clipEnabled={clipEnabled}
       clipSupported={clipSupported}
-      clipStatus={phase === 'gameover' && (inputMode === 'practice' || !clipEnabled) ? '' : clipStatus}
+      clipStatus={clipEnabled ? clipStatus : ''}
       clips={clips}
       recording={recording}
       onInputMode={handleInputMode}

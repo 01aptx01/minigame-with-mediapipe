@@ -47,6 +47,7 @@ The 1v1 mode is local split-screen play; it does not use online matchmaking. Pla
 - **Sorcerer's Duel** — cast Lightning, Reflect Shield, and Arcane Fist spells with hand gestures. Play solo against the Arcane Bot or in a 1v1 duel. 60-second rounds.
 - **Neon Muncher** — open your mouth to catch snacks and close it to deflect bombs. A triggered Shame Cam moment can produce a downloadable snapshot in the end card.
 - **Six Seven** — pump either wrist for a point on every lift in a 30-second solo run. The left wrist pops **6** on the left, and the right wrist pops **7** on the right. Webcam scores use a browser-local scoreboard; keyboard and touch practice scores stay separate and are not saved.
+- **Round replays** — opt in before a round in any game, then open that game's **Clips** to watch, download, or delete a saved run.
 - **Solo and 1v1 modes** with editable player names. Names are trimmed and limited to 18 characters.
 - **Browser-local scoreboards** retain up to eight entries per game; the end screen displays the top five and can clear that game's scores.
 - **Camera-free controls** include pointer input, keyboard input, or on-screen buttons depending on the game. Denying camera permission or playing without a webcam leaves these practice controls available.
@@ -138,9 +139,13 @@ The arcade hub links to each game. Most game pages let you choose Solo or 1v1 an
 
 ### Six Seven
 
-Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until at least one wrist is marked. After the countdown, lift either wrist to earn **+1**, then lower that wrist before lifting it again. The left wrist always pops **6** on the left side of the mirrored preview, and the right wrist always pops **7** on the right. Each wrist scores independently, so lifting both wrists can earn **+2**. Completed camera rounds appear on the scoreboard in that browser.
+Open [Six Seven](https://webcam-party-arcade.teerananpakdeekhan.chatgpt.site/?game=six-seven). Choose **Camera**, enable the webcam, and move into view until at least one wrist is marked. After the countdown, lift either wrist to earn **+1**, then lower that wrist before lifting it again. The left wrist pops **6** at a varying position in the left half of the mirrored stage, and the right wrist pops **7** in the right half. Each wrist scores independently, so lifting both wrists can earn **+2**. Completed camera rounds appear on the scoreboard in that browser.
 
-Turn on **Save my camera runs** before starting a camera round to capture the game view with your camera, wrist markers, hit effects, and score. Open **Clips** to watch, scrub, download, or delete your recent recordings. Six Seven keeps up to five completed clips in this browser and requests no microphone access. Clip recording uses browser media APIs and is optional.
+### Round replays
+
+Turn on **Save replays locally** in a game's setup before starting. The game saves a clip when the round completes. Open **Clips** from that game's setup or result screen to play, seek, download, or delete the recording. Each game keeps up to five completed clips in this browser.
+
+Clips contain the rendered game stage with the score and timer. If the stage shows a webcam feed, it also appears in the clip. Recording uses the game canvas and does not request microphone access. The clips stay in this browser unless you download and share a copy.
 
 Choose **Practice** to use the on-screen buttons or a keyboard. Press `A`, `D`, `←` or `→`, or tap either pad. Each discrete press or tap earns one point. Practice scores appear on the result screen for that round.
 

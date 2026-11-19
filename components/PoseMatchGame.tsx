@@ -6,7 +6,9 @@ import { ArcadeEndCard } from '@/components/arcade/ArcadeEndCard';
 import { ArcadeGameShell } from '@/components/arcade/ArcadeGameShell';
 import { ArcadeTitleCard } from '@/components/arcade/ArcadeTitleCard';
 import { useMediaPipe } from '@/contexts/MediaPipeContext';
+import { useArcadeReplay } from '@/hooks/useArcadeReplay';
 import { useArcadeSession } from '@/hooks/useArcadeSession';
+import type { ReplayHudSnapshot } from '@/lib/games/shared/replay-canvas';
 import {
   assignPoseToZone,
   computePoseTugRatio,
@@ -82,6 +84,19 @@ export default function PoseMatchGame() {
     recordScoreboardRound,
     handleClearScoreboard,
   } = useArcadeSession('pose-match-battle', initialPhase, '1v1');
+  const {
+    enabled: replayEnabled,
+    setEnabled: setReplayEnabled,
+    clips: replayClips,
+    recording: replayRecording,
+    status: replayStatus,
+    supported: replaySupported,
+    start: startReplay,
+    pause: pauseReplay,
+    resume: resumeReplay,
+    finish: finishReplay,
+    remove: removeReplay,
+  } = useArcadeReplay({ gameId: 'pose-match-battle', gameName: 'Pose Match Battle' });
 
   const gameStateRef = useRef<PoseGameState>(createInitialPoseGameState(initialPhase, '1v1'));
   const mvpSnapshotRef = useRef<MvpSnapshot | null>(null);
@@ -93,6 +108,18 @@ export default function PoseMatchGame() {
   });
 
   const [endSummary, setEndSummary] = useState<PoseEndSummary | null>(null);
+
+  const getReplayHudSnapshot = useCallback((): ReplayHudSnapshot => {
+    const state = gameStateRef.current;
+    return {
+      timeRemaining: state.timeRemaining,
+      p1Name: resolvedP1Name,
+      p1Score: state.p1.score,
+      ...(state.mode === '1v1'
+        ? { p2Name: resolvedP2Name, p2Score: state.p2.score }
+        : {}),
+    };
+  }, [resolvedP1Name, resolvedP2Name]);
 
   useEffect(() => {
     void initializePoseModel();
@@ -126,6 +153,8 @@ export default function PoseMatchGame() {
       const nextMode = overrideMode ?? mode;
       const fresh = createInitialPoseGameState('playing', nextMode);
       gameStateRef.current = fresh;
+      const canvas = canvasRef.current;
+      if (canvas) startReplay(canvas, getReplayHudSnapshot);
       mvpSnapshotRef.current = null;
       puppetPoseRef.current = { p1: null, p2: null };
       resetParticlePool(particlesRef.current);
@@ -134,7 +163,7 @@ export default function PoseMatchGame() {
       setPhase('playing');
       syncHudDom(fresh);
     },
-    [mode, setNewEntryIds, setPhase, syncHudDom]
+    [canvasRef, getReplayHudSnapshot, mode, setNewEntryIds, setPhase, startReplay, syncHudDom]
   );
 
   const handleModeChange = useCallback(
@@ -151,12 +180,14 @@ export default function PoseMatchGame() {
     const current = gameStateRef.current.phase;
     if (current === 'playing') {
       gameStateRef.current.phase = 'paused';
+      pauseReplay();
       setPhase('paused');
     } else if (current === 'paused') {
       gameStateRef.current.phase = 'playing';
+      resumeReplay();
       setPhase('playing');
     }
-  }, [setPhase]);
+  }, [pauseReplay, resumeReplay, setPhase]);
 
   const triggerPuppetPose = useCallback((player: PlayerId, kind: PoseKind | null) => {
     puppetPoseRef.current[player] = kind;
@@ -552,6 +583,10 @@ export default function PoseMatchGame() {
 
       if (sim.roundEnded) {
         audioRef.current?.playRoundEnd();
+        finishReplay(
+          Math.max(state.p1.score, state.p2.score),
+          POSE_ROUND_DURATION_SEC - Math.max(0, state.timeRemaining)
+        );
         recordScoreboardRound(
           state.mode,
           { score: state.p1.score, detail: `${state.p1.posesMatched} poses` },
@@ -642,6 +677,7 @@ export default function PoseMatchGame() {
     canvasRef,
     captureMvpSnapshot,
     predictPose,
+    finishReplay,
     recordScoreboardRound,
     setPhase,
     sizeRef,
@@ -810,6 +846,16 @@ export default function PoseMatchGame() {
       onTogglePause={togglePause}
       onToggleMute={toggleMute}
       onRestart={() => startNewRound()}
+      replayControls={{
+        gameName: 'Pose Match Battle',
+        enabled: replayEnabled,
+        onEnabledChange: setReplayEnabled,
+        supported: replaySupported,
+        clips: replayClips,
+        status: replayStatus,
+        recording: replayRecording,
+        onRemove: removeReplay,
+      }}
       titleOverlay={titleOverlay}
       endOverlay={endOverlay}
       bottomControls={bottomControls}

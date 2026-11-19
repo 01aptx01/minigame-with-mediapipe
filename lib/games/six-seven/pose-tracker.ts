@@ -14,6 +14,8 @@ function createWorkerTracker(signal: AbortSignal): Promise<SixSevenPoseTracker> 
     let isClosed = false;
     let isWarmedUp = false;
     let acceptsVideoFrames = typeof VideoFrame === 'function';
+    let isCapturing = false;
+    let captureFailures = 0;
     let pendingFrame: {
       resolve: (pose: SixSevenLandmark[] | null) => void;
       reject: (error: Error) => void;
@@ -41,26 +43,57 @@ function createWorkerTracker(signal: AbortSignal): Promise<SixSevenPoseTracker> 
     }
 
     async function sample(video: HTMLVideoElement, atMs: number) {
-      if (isClosed || pendingFrame) return null;
+      if (isClosed || pendingFrame || isCapturing) return null;
+      isCapturing = true;
       let frame: ImageBitmap | VideoFrame | undefined;
-      if (acceptsVideoFrames && Math.max(video.videoWidth, video.videoHeight) <= 1280) {
-        try {
-          // Transfer the camera frame directly when WebCodecs is available.
-          frame = new VideoFrame(video, { timestamp: Math.round(atMs * 1000) });
-        } catch {
-          acceptsVideoFrames = false;
+      try {
+        if (acceptsVideoFrames && Math.max(video.videoWidth, video.videoHeight) <= 1280) {
+          try {
+            // Transfer the camera frame directly when WebCodecs is available.
+            frame = new VideoFrame(video, { timestamp: Math.round(atMs * 1000) });
+          } catch {
+            acceptsVideoFrames = false;
+          }
         }
-      }
-      if (!frame) {
-        const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
-        frame = scale === 1
-          ? await createImageBitmap(video)
-          : await createImageBitmap(video, {
-            resizeWidth: Math.max(1, Math.round(video.videoWidth * scale)),
-            resizeHeight: Math.max(1, Math.round(video.videoHeight * scale)),
-            resizeQuality: 'low',
+        if (!frame) {
+          const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+          const bitmapPromise = scale === 1
+            ? createImageBitmap(video)
+            : createImageBitmap(video, {
+              resizeWidth: Math.max(1, Math.round(video.videoWidth * scale)),
+              resizeHeight: Math.max(1, Math.round(video.videoHeight * scale)),
+              resizeQuality: 'low',
+            });
+          let timedOut = false;
+          let captureTimeout = 0;
+          const timeoutPromise = new Promise<never>((_, rejectCapture) => {
+            captureTimeout = window.setTimeout(() => {
+              timedOut = true;
+              rejectCapture(new Error('Camera frame capture timed out.'));
+            }, 2_000);
           });
+          void bitmapPromise.then((bitmap) => {
+            if (timedOut || isClosed) bitmap.close();
+          }).catch(() => {});
+          try {
+            frame = await Promise.race([bitmapPromise, timeoutPromise]);
+          } finally {
+            window.clearTimeout(captureTimeout);
+          }
+        }
+      } catch {
+        if (isClosed) return null;
+        captureFailures += 1;
+        if (captureFailures >= 3) {
+          fail();
+          throw failure;
+        }
+        return null;
+      } finally {
+        isCapturing = false;
       }
+
+      captureFailures = 0;
       if (isClosed) {
         frame.close();
         return null;

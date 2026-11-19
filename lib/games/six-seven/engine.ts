@@ -22,6 +22,8 @@ interface WristTrack {
   armed: boolean;
   moving: boolean;
   pending: boolean;
+  lastSeenAtMs: number;
+  missingSinceAtMs: number | null;
 }
 
 export interface SixSevenState {
@@ -42,7 +44,11 @@ const POP_TRAVEL = 0.02;
 const REARM_TRAVEL = 0.015;
 const MIN_MOTION_STEP = 0.007;
 const FILTER_TIME_CONSTANT_MS = 12;
-const TRACKING_GAP_MS = 180;
+// Camera inference often arrives much slower than the camera's frame rate.
+// Preserve a continuous stroke across ordinary scheduling jitter, but rebase
+// after longer gaps so a wrist that moved while unseen cannot score on return.
+const CONTIGUOUS_SAMPLE_GAP_MS = 280;
+const WRIST_REACQUIRE_GRACE_MS = 360;
 
 export function createSixSevenState(): SixSevenState {
   return {
@@ -105,10 +111,18 @@ export function isSixSevenPoseVisible(pose: Pose): boolean {
 function advanceWrist(
   previous: WristTrack | null,
   rawY: number,
-  elapsedMs: number
+  nowMs: number
 ): { track: WristTrack; travel: number } {
   if (!previous) {
-    return { track: { filteredY: rawY, anchorY: rawY, armed: true, moving: false, pending: false }, travel: 0 };
+    return { track: createWristTrack(rawY, nowMs), travel: 0 };
+  }
+
+  const elapsedMs = nowMs - previous.lastSeenAtMs;
+  // The first visible sample after any omission is a new baseline. Keeping the
+  // armed state prevents held wrists from scoring again before they lower.
+  if (previous.missingSinceAtMs !== null || elapsedMs > CONTIGUOUS_SAMPLE_GAP_MS) {
+    const loweredSincePeak = !previous.armed && rawY - previous.anchorY >= REARM_TRAVEL;
+    return { track: createWristTrack(rawY, nowMs, previous.armed || loweredSincePeak), travel: 0 };
   }
 
   const alpha = 1 - Math.exp(-elapsedMs / FILTER_TIME_CONSTANT_MS);
@@ -131,6 +145,8 @@ function advanceWrist(
         armed,
         moving: armed ? rising : falling,
         pending: armed ? anchorY - upperY >= POP_TRAVEL : resetReady,
+        lastSeenAtMs: nowMs,
+        missingSinceAtMs: null,
       },
       travel: 0,
     };
@@ -142,10 +158,43 @@ function advanceWrist(
   // Two rising samples confirm a fast stroke. If the entire lift landed in
   // one sample, a second sample above the threshold rejects a one-frame spike.
   if (pending && ((previous.moving && rising) || previous.pending)) {
-    return { track: { filteredY, anchorY: filteredY, armed: false, moving: false, pending: false }, travel };
+    return {
+      track: {
+        filteredY,
+        anchorY: filteredY,
+        armed: false,
+        moving: false,
+        pending: false,
+        lastSeenAtMs: nowMs,
+        missingSinceAtMs: null,
+      },
+      travel,
+    };
   }
 
-  return { track: { filteredY, anchorY, armed: true, moving: rising, pending }, travel: 0 };
+  return {
+    track: { filteredY, anchorY, armed: true, moving: rising, pending, lastSeenAtMs: nowMs, missingSinceAtMs: null },
+    travel: 0,
+  };
+}
+
+function createWristTrack(rawY: number, nowMs: number, armed = true): WristTrack {
+  return {
+    filteredY: rawY,
+    anchorY: rawY,
+    armed,
+    moving: false,
+    pending: false,
+    lastSeenAtMs: nowMs,
+    missingSinceAtMs: null,
+  };
+}
+
+function missWrist(previous: WristTrack | null, nowMs: number): WristTrack | null {
+  if (!previous) return null;
+  const missingSinceAtMs = previous.missingSinceAtMs ?? nowMs;
+  if (nowMs - missingSinceAtMs > WRIST_REACQUIRE_GRACE_MS) return null;
+  return { ...previous, moving: false, pending: false, missingSinceAtMs };
 }
 
 /** Each wrist scores an upward stroke independently; lowering it rearms it. */
@@ -157,34 +206,33 @@ export function updateSixSevenGesture(
 ): SixSevenHit[] {
   if (!Number.isFinite(nowMs)) return [];
   const tracking = state.tracking;
-  const elapsedMs = tracking.lastSampleAtMs === null ? 0 : nowMs - tracking.lastSampleAtMs;
-  if (tracking.lastSampleAtMs !== null && elapsedMs <= 0) return [];
+  if (tracking.lastSampleAtMs !== null && nowMs <= tracking.lastSampleAtMs) return [];
   tracking.lastSampleAtMs = nowMs;
 
   const wrists = readWrists(pose);
-  if (elapsedMs > TRACKING_GAP_MS) {
-    tracking.left = null;
-    tracking.right = null;
+  // Each wrist has its own dropout timer. Brief missing results keep a track
+  // warm, while reacquisition always rebases before motion can score again.
+  let left: ReturnType<typeof advanceWrist> | null = null;
+  let right: ReturnType<typeof advanceWrist> | null = null;
+  if (wrists?.leftWrist) {
+    left = advanceWrist(tracking.left, wrists.leftWrist.y, nowMs);
+    tracking.left = left.track;
+  } else {
+    tracking.left = missWrist(tracking.left, nowMs);
   }
-  if (!wrists) {
-    tracking.left = null;
-    tracking.right = null;
-    return [];
+  if (wrists?.rightWrist) {
+    right = advanceWrist(tracking.right, wrists.rightWrist.y, nowMs);
+    tracking.right = right.track;
+  } else {
+    tracking.right = missWrist(tracking.right, nowMs);
   }
-
-  // Each wrist has its own baseline and rearm state. A hidden wrist is reset
-  // by itself, leaving the other wrist playable through temporary occlusion.
-  const left = wrists.leftWrist && advanceWrist(tracking.left, wrists.leftWrist.y, elapsedMs);
-  const right = wrists.rightWrist && advanceWrist(tracking.right, wrists.rightWrist.y, elapsedMs);
-  tracking.left = left?.track ?? null;
-  tracking.right = right?.track ?? null;
   if (!scoringEnabled) return [];
 
   const hits: SixSevenHit[] = [];
-  if (left && left.travel > 0 && wrists.leftWrist) {
+  if (left && left.travel > 0 && wrists?.leftWrist) {
     hits.push(recordPop(state, 'left', wrists.leftWrist.x, wrists.leftWrist.y, nowMs));
   }
-  if (right && right.travel > 0 && wrists.rightWrist) {
+  if (right && right.travel > 0 && wrists?.rightWrist) {
     hits.push(recordPop(state, 'right', wrists.rightWrist.x, wrists.rightWrist.y, nowMs));
   }
   return hits;
